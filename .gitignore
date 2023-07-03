@@ -24,3 +24,5 @@ venv.bak/
 # JetBrains project files
 .idea
 cmake-build-*
+
+python/tutorials/result/
