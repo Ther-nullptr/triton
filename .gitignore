@@ -27,3 +27,5 @@ cmake-build-*
 
 python/tutorials/result/
 *.log
+logs/
+*.csv
