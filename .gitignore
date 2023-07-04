@@ -26,3 +26,4 @@ venv.bak/
 cmake-build-*
 
 python/tutorials/result/
+*.log

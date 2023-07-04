@@ -243,6 +243,7 @@ def batched_matmul_kernel(
     if ACTIVATION == "leaky_relu":
         accumulator = leaky_relu(accumulator)
     c = accumulator.to(tl.float16)
+    # c = accumulator
 
     # -----------------------------------------------------------
     # Write back the block of the output matrix C with masks.
@@ -337,7 +338,7 @@ else:
         args={},
     )
 )
-def benchmark(M, N, K, provider):
+def benchmark_4(M, N, K, provider):
     a = torch.randn((4, M, K), device='cuda', dtype=torch.float16)
     b = torch.randn((4, K, N), device='cuda', dtype=torch.float16)
     percentiles = [0.5, 0.2, 0.8]
@@ -348,5 +349,36 @@ def benchmark(M, N, K, provider):
     perf = lambda ms: 2 * 4 * M * N * K * 1e-12 / (ms * 1e-3)
     return perf(ms), perf(max_ms), perf(min_ms)
 
+# benchmark_4.run(show_plots=False, print_data=True, save_path='result/03-2-matrix-multiplication-batch-4/')
 
-benchmark.run(show_plots=False, print_data=True, save_path='result/03-2-matrix-multiplication/')
+@triton.testing.perf_report(
+    triton.testing.Benchmark(
+        x_names=['M', 'N', 'K'],  # Argument names to use as an x-axis for the plot
+        x_vals=[
+            128 * i for i in range(2, 33)
+        ],  # Different possible values for `x_name`
+        line_arg='provider',  # Argument name whose value corresponds to a different line in the plot
+        # Possible values for `line_arg`
+        line_vals=['cublas', 'triton'],
+        # Label name for the lines
+        line_names=["cuBLAS", "Triton"],
+        # Line styles
+        styles=[('green', '-'), ('blue', '-')],
+        ylabel="TFLOPS",  # Label name for the y-axis
+        plot_name="matmul-performance",  # Name for the plot, used also as a file name for saving the plot.
+        args={},
+    )
+)
+def benchmark_16(M, N, K, provider):
+    a = torch.randn((16, M, K), device='cuda', dtype=torch.float16)
+    b = torch.randn((16, K, N), device='cuda', dtype=torch.float16)
+    percentiles = [0.5, 0.2, 0.8]
+    if provider == 'cublas':
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: torch.matmul(a, b), percentiles=percentiles)
+    if provider == 'triton':
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: batched_matmul(a, b), percentiles=percentiles)
+    perf = lambda ms: 2 * 16 * M * N * K * 1e-12 / (ms * 1e-3)
+    return perf(ms), perf(max_ms), perf(min_ms)
+
+benchmark_16.run(show_plots=False, print_data=True, save_path='result/03-2-matrix-multiplication-batch-16/')
+
