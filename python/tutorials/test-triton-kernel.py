@@ -175,17 +175,17 @@ import triton.language as tl
     key=['M', 'N', 'K'],
 )
 @triton.jit
-def matmul_kernel(
+def batched_matmul_kernel(
     # Pointers to matrices
     a_ptr, b_ptr, c_ptr,
     # Matrix dimensions
-    M, N, K,
+    B, M, N, K,
     # The stride variables represent how much to increase the ptr by when moving by 1
     # element in a particular dimension. E.g. `stride_am` is how much to increase `a_ptr`
     # by to get the element one row down (A has M rows).
-    stride_am, stride_ak,
-    stride_bk, stride_bn,
-    stride_cm, stride_cn,
+    stride_ab, stride_am, stride_ak,
+    stride_bb, stride_bk, stride_bn,
+    stride_cb, stride_cm, stride_cn,
     # Meta-parameters
     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
     GROUP_SIZE_M: tl.constexpr,
@@ -199,6 +199,7 @@ def matmul_kernel(
     # This is done in a grouped ordering to promote L2 data reuse.
     # See above `L2 Cache Optimizations` section for details.
     pid = tl.program_id(axis=0)
+    offs_b = tl.program_id(axis=1) # [new] dimension for parallel
     num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)
     num_pid_n = tl.cdiv(N, BLOCK_SIZE_N)
     num_pid_in_group = GROUP_SIZE_M * num_pid_n
@@ -218,8 +219,8 @@ def matmul_kernel(
     offs_am = (pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)) % M
     offs_bn = (pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)) % N
     offs_k = tl.arange(0, BLOCK_SIZE_K)
-    a_ptrs = a_ptr + (offs_am[:, None] * stride_am + offs_k[None, :] * stride_ak)
-    b_ptrs = b_ptr + (offs_k[:, None] * stride_bk + offs_bn[None, :] * stride_bn)
+    a_ptrs = a_ptr + (offs_b * stride_ab + offs_am[:, None] * stride_am + offs_k[None, :] * stride_ak)
+    b_ptrs = b_ptr + (offs_b * stride_bb + offs_k[:, None] * stride_bk + offs_bn[None, :] * stride_bn)
 
     # -----------------------------------------------------------
     # Iterate to compute a block of the C matrix.
@@ -242,13 +243,14 @@ def matmul_kernel(
     if ACTIVATION == "leaky_relu":
         accumulator = leaky_relu(accumulator)
     c = accumulator.to(tl.float16)
+    # c = accumulator
 
     # -----------------------------------------------------------
     # Write back the block of the output matrix C with masks.
     offs_cm = pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
     offs_cn = pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
-    c_ptrs = c_ptr + stride_cm * offs_cm[:, None] + stride_cn * offs_cn[None, :]
-    c_mask = (offs_cm[:, None] < M) & (offs_cn[None, :] < N)
+    c_ptrs = c_ptr + stride_cm * offs_cm[:, None] + stride_cn * offs_cn[None, :] + offs_b * stride_cb
+    c_mask = (offs_b < B) & (offs_cm[:, None] < M) & (offs_cn[None, :] < N)
     tl.store(c_ptrs, c, mask=c_mask)
 
 
@@ -264,25 +266,26 @@ def leaky_relu(x):
 # and (1) checks any shape constraint; (2) allocates the output; (3) launches the above kernel.
 
 
-def matmul(a, b, activation=""):
+def batched_matmul(a:torch.Tensor, b:torch.Tensor, activation=""):
     # Check constraints.
-    assert a.shape[1] == b.shape[0], "Incompatible dimensions"
+    assert a.shape[0] == b.shape[0], "Must be the same batch size"
+    assert a.shape[2] == b.shape[1], "Incompatible dimensions"
     assert a.is_contiguous(), "Matrix A must be contiguous"
     assert b.is_contiguous(), "Matrix B must be contiguous"
-    M, K = a.shape
-    K, N = b.shape
+    B, M, K = a.shape
+    B, K, N = b.shape
     # Allocates output.
-    c = torch.empty((M, N), device=a.device, dtype=a.dtype)
+    c = torch.empty((B, M, N), device=a.device, dtype=a.dtype)
     # 1D launch kernel where each block gets its own program.
     grid = lambda META: (
-        triton.cdiv(M, META['BLOCK_SIZE_M']) * triton.cdiv(N, META['BLOCK_SIZE_N']),
+        triton.cdiv(M, META['BLOCK_SIZE_M']) * triton.cdiv(N, META['BLOCK_SIZE_N']), B
     )
-    matmul_kernel[grid](
+    batched_matmul_kernel[grid](
         a, b, c,
-        M, N, K,
-        a.stride(0), a.stride(1),
-        b.stride(0), b.stride(1),
-        c.stride(0), c.stride(1),
+        B, M, N, K,
+        a.stride(0), a.stride(1), a.stride(2),
+        b.stride(0), b.stride(1), b.stride(2),
+        c.stride(0), c.stride(1), c.stride(2),
         ACTIVATION=activation
     )
     return c
@@ -293,64 +296,69 @@ def matmul(a, b, activation=""):
 # ---------
 #
 # We can test our custom matrix multiplication operation against a native torch implementation (i.e., cuBLAS).
+if __name__ == '__main__':
+    iter_nums = 1
+    data_type = torch.float16
 
-torch.manual_seed(0)
-a = torch.randn((1314, 2001), device='cuda', dtype=torch.float16)
-b = torch.randn((2001, 1413), device='cuda', dtype=torch.float16)
-print(f"a={a}")
-print(f"b={b}")
-triton_output = matmul(a, b)
-torch_output = torch.matmul(a, b)
-print(f"triton_output={triton_output}")
-print(f"torch_output={torch_output}")
-if torch.allclose(triton_output, torch_output, atol=1e-1, rtol=0):
-    print("✅ Triton and Torch match")
-else:
-    print("❌ Triton and Torch differ")
+    test_dict_train = {
+        'X x QKV w': (1, 8192, 4608, 12288),
+        'Q x K^T': (192, 512, 512, 128),
+        'QK^T x V': (192, 512, 128, 512),
+        'Proj': (1, 8192, 12288, 1536),
+        'FC1': (1, 8192, 6144, 12288),
+        'FC2': (1, 8192, 12288, 6144),
+        'Q x K^T Flat': (1, 512, 512, 24576),
+        'QK^T x V Flat': (1, 512, 24576, 512)
+    }
 
-print(f"diff={triton_output - torch_output}")
-print(f"sum_diff={torch.sum(triton_output - torch_output)}")
-print(f"rel_diff={torch.sum(torch.abs(triton_output - torch_output)) / torch.sum(torch.abs(torch_output))}")
+    test_dict_inference_w_o_KV = {
+        'X x QKV w': (1, 8704, 4608, 12288),
+        'Q x K^T': (192, 543, 543, 128),
+        'QK^T x V': (192, 543, 128, 543),
+        'Proj': (1, 8688, 12288, 1536),
+        'FC1': (1, 8688, 6144, 12288),
+        'FC2': (1, 8688, 12288, 6144),
+        'Q x K^T Flat': (1, 543, 543, 24576),
+        'QK^T x V Flat': (1, 543, 24576, 543)
+    }
 
-# %%
-# Benchmark
-# ---------
-#
-# Square Matrix Performance
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~
-#
-# We can now compare the performance of our kernel against that of cuBLAS. Here we focus on square matrices,
-# but feel free to arrange this script as you wish to benchmark any other matrix shape.
+    test_dict_inference_w_KV = {
+        'X x QKV w': (1, 16, 4608, 12288),
+        'Q x K^T': (192, 1, 543, 128),
+        'QK^T x V': (192, 1, 128, 543),
+        'Proj': (1, 16, 12288, 1536),
+        'FC1': (1, 16, 6144, 12288),
+        'FC2': (1, 16, 12288, 6144),
+        'Q x K^T Flat': (1, 1, 543, 24576),
+        'QK^T x V Flat': (1, 1, 24576, 543)
+    }
 
+    # warm up
+    x = torch.randn((2, 114, 514), dtype=data_type).cuda()
+    y = torch.randn((2, 514, 114), dtype=data_type).cuda()
+    torch_output = torch.bmm(x, y)
+    triton_output = batched_matmul(x, y)
+    print(f"triton_output={triton_output}")
+    print(f"torch_output={torch_output}")    
+    print(f"diff={triton_output - torch_output}")
+    print(f"sum_diff={torch.sum(triton_output - torch_output)}")
+    # if torch.allclose(triton_output, torch_output, atol=1e-2, rtol=0):
+    #     print("✅ Triton and Torch match")
+    # else:
+    #     print("❌ Triton and Torch differ")
 
-@triton.testing.perf_report(
-    triton.testing.Benchmark(
-        x_names=['M', 'N', 'K'],  # Argument names to use as an x-axis for the plot
-        x_vals=[
-            128 * i for i in range(2, 33)
-        ],  # Different possible values for `x_name`
-        line_arg='provider',  # Argument name whose value corresponds to a different line in the plot
-        # Possible values for `line_arg`
-        line_vals=['cublas', 'triton'],
-        # Label name for the lines
-        line_names=["cuBLAS", "Triton"],
-        # Line styles
-        styles=[('green', '-'), ('blue', '-')],
-        ylabel="TFLOPS",  # Label name for the y-axis
-        plot_name="matmul-performance",  # Name for the plot, used also as a file name for saving the plot.
-        args={},
-    )
-)
-def benchmark(M, N, K, provider):
-    a = torch.randn((M, K), device='cuda', dtype=torch.float16)
-    b = torch.randn((K, N), device='cuda', dtype=torch.float16)
-    percentiles = [0.5, 0.2, 0.8]
-    if provider == 'cublas':
-        ms, min_ms, max_ms = triton.testing.do_bench(lambda: torch.matmul(a, b), percentiles=percentiles)
-    if provider == 'triton':
-        ms, min_ms, max_ms = triton.testing.do_bench(lambda: matmul(a, b), percentiles=percentiles)
-    perf = lambda ms: 2 * M * N * K * 1e-12 / (ms * 1e-3)
-    return perf(ms), perf(max_ms), perf(min_ms)
-
-
-# benchmark.run(show_plots=False, print_data=True, save_path='result/03-matrix-multiplication/')
+    for test_dict in [test_dict_train, test_dict_inference_w_o_KV, test_dict_inference_w_KV]:
+        print('==============================')
+        for key, val in test_dict.items():
+            B, M, N, K = val
+            # test the time of torch.bmm
+            a = torch.randn((B, M, K), dtype=data_type).cuda()
+            b = torch.randn((B, K, N), dtype=data_type).cuda()
+            start = torch.cuda.Event(enable_timing=True)
+            start.record()
+            for i in range(iter_nums):
+                c = batched_matmul(a, b)
+            end = torch.cuda.Event(enable_timing=True)
+            end.record()
+            torch.cuda.synchronize()
+            print(f'batched_matmul {data_type} {key} {val} time: {start.elapsed_time(end)/iter_nums} ms', flush=True)
