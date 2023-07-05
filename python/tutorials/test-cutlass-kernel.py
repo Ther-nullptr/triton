@@ -6,7 +6,7 @@ from functools import partial
 
 def parse_args():
     args = argparse.ArgumentParser()
-    args.add_argument("--acc-dtype", type=str, choices=["f16", "f32"], default="f16")
+    args.add_argument("--acc-dtype", type=str, choices=["f16", "f32"], default="f32")
     args.add_argument("--out-dtype", type=str, choices=["f16", "f32"], default="f16")
     args.add_argument("--split-k-slices", type=int, default=1)
     args.add_argument("--profiling-iterations", type=int, default=5)

@@ -291,38 +291,9 @@ def batched_matmul(a:torch.Tensor, b:torch.Tensor, activation=""):
     return c
 
 # test data
-test_dict_train = {
-        'X x QKV w': (1, 8192, 4608, 12288),
-        'Q x K^T': (192, 512, 512, 128),
-        'QK^T x V': (192, 512, 128, 512),
-        'Proj': (1, 8192, 12288, 1536),
-        'FC1': (1, 8192, 6144, 12288),
-        'FC2': (1, 8192, 12288, 6144),
-        'Q x K^T Flat': (1, 512, 512, 24576),
-        'QK^T x V Flat': (1, 512, 24576, 512)
-    }
-
-test_dict_inference_w_o_KV = {
-    'X x QKV w': (1, 8704, 4608, 12288),
-    'Q x K^T': (192, 543, 543, 128),
-    'QK^T x V': (192, 543, 128, 543),
-    'Proj': (1, 8688, 12288, 1536),
-    'FC1': (1, 8688, 6144, 12288),
-    'FC2': (1, 8688, 12288, 6144),
-    'Q x K^T Flat': (1, 543, 543, 24576),
-    'QK^T x V Flat': (1, 543, 24576, 543)
-}
-
-test_dict_inference_w_KV = {
-    'X x QKV w': (1, 16, 4608, 12288),
-    'Q x K^T': (192, 1, 543, 128),
-    'QK^T x V': (192, 1, 128, 543),
-    'Proj': (1, 16, 12288, 1536),
-    'FC1': (1, 16, 6144, 12288),
-    'FC2': (1, 16, 12288, 6144),
-    'Q x K^T Flat': (1, 1, 543, 24576),
-    'QK^T x V Flat': (1, 1, 24576, 543)
-}
+test_general_data = [
+    (1, m, n, k) for n in [32, 64, 128, 256] for m, k in [(2048, 8192), (8192, 2048), (2752, 8192), (8192, 2752)] 
+]
 
 # %%
 # Unit Test
@@ -345,23 +316,21 @@ print(f"sum_diff={torch.sum(triton_output - torch_output)}")
 # TFLOPS
 def TFLOPS(B, M, N, K, ms):
     return 2 * B * M * N * K * 1e-12 / (ms * 1e-3)
-    
 
-# train
 @triton.testing.perf_report(
     triton.testing.Benchmark(
         x_names=['shape'],
-        x_vals = [val for val in test_dict_train.values()],
+        x_vals = [(1, m, n, k) for n in [32, 64, 128, 256] for m, k in [(2048, 8192), (8192, 2048), (2752, 8192), (8192, 2752)]],
         line_arg='provider',
         line_vals=['triton', 'torch'],
         line_names=['triton', 'torch'],
         styles=[('blue', '-'), ('green', '-')],
-        ylabel='TFLOPS',
+        ylabel='ms',
         plot_name='',
         args={}
     )
 )
-def benchmark_train(shape, provider):
+def benchmark(shape, provider):
     B, M, N, K = shape
     a = torch.randn((B, M, K), device='cuda', dtype=torch.float16)
     b = torch.randn((B, K, N), device='cuda', dtype=torch.float16)
@@ -370,62 +339,6 @@ def benchmark_train(shape, provider):
         ms, min_ms, max_ms = triton.testing.do_bench(lambda: torch.bmm(a, b), percentiles=percentiles)
     if provider == 'triton':
         ms, min_ms, max_ms = triton.testing.do_bench(lambda: batched_matmul(a, b), percentiles=percentiles)
-    return TFLOPS(B, M, N, K, ms), TFLOPS(B, M, N, K, min_ms), TFLOPS(B, M, N, K, max_ms)
+    return ms, min_ms, max_ms
 
-benchmark_train.run(show_plots=False, print_data=True, save_path='result/train/')
-
-
-# inference w/o KV
-@triton.testing.perf_report(
-    triton.testing.Benchmark(
-        x_names=['shape'],
-        x_vals = [val for val in test_dict_inference_w_o_KV.values()],
-        line_arg='provider',
-        line_vals=['triton', 'torch'],
-        line_names=['triton', 'torch'],
-        styles=[('blue', '-'), ('green', '-')],
-        ylabel='TFLOPS',
-        plot_name='',
-        args={}
-    )
-)
-def benchmark_inference_w_o_KV(shape, provider):
-    B, M, N, K = shape
-    a = torch.randn((B, M, K), device='cuda', dtype=torch.float16)
-    b = torch.randn((B, K, N), device='cuda', dtype=torch.float16)
-    percentiles = [0.5, 0.2, 0.8]
-    if provider == 'torch':
-        ms, min_ms, max_ms = triton.testing.do_bench(lambda: torch.bmm(a, b), percentiles=percentiles)
-    if provider == 'triton':
-        ms, min_ms, max_ms = triton.testing.do_bench(lambda: batched_matmul(a, b), percentiles=percentiles)
-    return TFLOPS(B, M, N, K, ms), TFLOPS(B, M, N, K, min_ms), TFLOPS(B, M, N, K, max_ms)
-
-benchmark_inference_w_o_KV.run(show_plots=False, print_data=True, save_path='result/inference_w_o_KV/')
-
-
-# inference w KV
-@triton.testing.perf_report(
-    triton.testing.Benchmark(
-        x_names=['shape'],
-        x_vals = [val for val in test_dict_inference_w_KV.values()],
-        line_arg='provider',
-        line_vals=['triton', 'torch'],
-        line_names=['triton', 'torch'],
-        styles=[('blue', '-'), ('green', '-')],
-        ylabel='TFLOPS',
-        plot_name='',
-        args={}
-    )
-)
-def benchmark_inference_w_KV(shape, provider):
-    B, M, N, K = shape
-    a = torch.randn((B, M, K), device='cuda', dtype=torch.float16)
-    b = torch.randn((B, K, N), device='cuda', dtype=torch.float16)
-    percentiles = [0.5, 0.2, 0.8]
-    if provider == 'torch':
-        ms, min_ms, max_ms = triton.testing.do_bench(lambda: torch.bmm(a, b), percentiles=percentiles)
-    if provider == 'triton':
-        ms, min_ms, max_ms = triton.testing.do_bench(lambda: batched_matmul(a, b), percentiles=percentiles)
-    return TFLOPS(B, M, N, K, ms), TFLOPS(B, M, N, K, min_ms), TFLOPS(B, M, N, K, max_ms)
-
-benchmark_inference_w_KV.run(show_plots=False, print_data=True, save_path='result/inference_w_KV/')
+benchmark.run(show_plots=False, print_data=True, save_path='result/general/')

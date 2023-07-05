@@ -29,3 +29,6 @@ python/tutorials/result/
 *.log
 logs/
 *.csv
+
+cublas_test
+cublas_test_2
