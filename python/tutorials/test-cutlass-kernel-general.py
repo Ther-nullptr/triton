@@ -6,7 +6,7 @@ from functools import partial
 
 def parse_args():
     args = argparse.ArgumentParser()
-    args.add_argument("--acc-dtype", type=str, choices=["f16", "f32"], default="f16")
+    args.add_argument("--acc-dtype", type=str, choices=["f16", "f32"], default="f32")
     args.add_argument("--out-dtype", type=str, choices=["f16", "f32"], default="f16")
     args.add_argument("--split-k-slices", type=int, default=1)
     args.add_argument("--profiling-iterations", type=int, default=5)
@@ -34,7 +34,8 @@ def _run_cutlass(instruction: str, workload: str):
     df = pd.read_csv(f"{ARGS.log_dir}/{workload}.gemm.csv")
     df.sort_values('GFLOPs', inplace=True, ascending=False)
     df.reset_index(inplace=True)
-    print(f"[{workload}] max TFLOPs: {df['GFLOPs'][0] / 1000}, operation: {df['Operation'][0]}, runtime: {df['Runtime'][0]}, GB/s: {df['GB/s'][0]}")
+    print(f"[{workload}] max GFLOPs: {df['GFLOPs'][0]}, operation: {df['Operation'][0]}, runtime: {df['Runtime'][0]}, GB/s: {df['GB/s'][0]}")
+
 
 
 def _run_gemm(
@@ -93,45 +94,12 @@ WORKLOADS = {}
 
 
 def main():
-    test_dict_train = {
-        'XxQKVw': (1, 8192, 4608, 12288),
-        'QxK^T': (192, 512, 512, 128),
-        'QK^TxV': (192, 512, 128, 512),
-        'Proj': (1, 8192, 12288, 1536),
-        'FC1': (1, 8192, 6144, 12288),
-        'FC2': (1, 8192, 12288, 6144),
-        'QxK^TFlat': (1, 512, 512, 24576),
-        'QK^TxVFlat': (1, 512, 24576, 512)
-    }
-
-    test_dict_inference_w_o_KV = {
-        'XxQKVw': (1, 8704, 4608, 12288),
-        'QxK^T': (192, 543, 543, 128),
-        'QK^TxV': (192, 543, 128, 543),
-        'Proj': (1, 8688, 12288, 1536),
-        'FC1': (1, 8688, 6144, 12288),
-        'FC2': (1, 8688, 12288, 6144),
-        'QxK^TFlat': (1, 543, 543, 24576),
-        'QK^TxVFlat': (1, 543, 24576, 543)
-    }
-
-    test_dict_inference_w_KV = {
-        'XxQKVw': (1, 16, 4608, 12288),
-        'QxK^T': (192, 1, 543, 128),
-        'QK^TxV': (192, 1, 128, 543),
-        'Proj': (1, 16, 12288, 1536),
-        'FC1': (1, 16, 6144, 12288),
-        'FC2': (1, 16, 12288, 6144),
-        'QxK^TFlat': (1, 1, 543, 24576),
-        'QK^TxVFlat': (1, 1, 24576, 543)
-    }
-
-    for i, test_dict in zip(['train', 'inference_w_o_KV', 'inference_w_KV'], [test_dict_train, test_dict_inference_w_o_KV, test_dict_inference_w_KV]):
-        for key, val in test_dict.items():
+    for n in [32, 64, 128, 256]:
+        for m, k in [(2048, 8192), (8192, 2048), (2752, 8192), (8192, 2752)]:
             WORKLOADS.update(
                 {
-                    f"{key}-{val}-{i}": partial(
-                        GMM, workload=f"{key}-{val[0]}-{val[1]}-{val[2]}-{i}", b=val[0], m=val[1], n=val[2], k=val[3]
+                    f"{m}-{n}-{k}": partial(
+                        GMM, workload=f"{m}-{n}-{k}", b=1, m=m, n=n, k=k
                     )
                 }
             )
@@ -148,7 +116,6 @@ def main():
             profiling_iterations=ARGS.profiling_iterations,
             k_slices=ARGS.split_k_slices
         )
-
 
 if __name__ == "__main__":
     main()
