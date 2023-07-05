@@ -7,10 +7,10 @@ def parse_args():
     args = argparse.ArgumentParser()
     args.add_argument("--acc-dtype", type=str, choices=["f16", "f32"], default="f16")
     args.add_argument("--out-dtype", type=str, choices=["f16", "f32"], default="f16")
-    args.add_argument("--split-k-slices", type=int, default=2)
+    args.add_argument("--split-k-slices", type=int, default=1)
     args.add_argument("--profiling-iterations", type=int, default=5)
     args.add_argument("--warmup-iterations", type=int, default=1)
-    args.add_argument("--cutlass-home", type=str)
+    args.add_argument("--cutlass-home", type=str, default='/home/yujin/workspace/cutlass')
     args.add_argument("--log-dir", type=str, default="logs/cutlass")
     parsed = args.parse_args()
     parsed.cutlass_home = parsed.cutlass_home or os.getenv("CUTLASS_HOME")
@@ -53,6 +53,7 @@ def _run_gemm(
         f" --A=f16:row --B=f16:column --C={out_dtype}"
         f" --accumulator-type={acc_dtype}"
         f" --split-k-slices={k_slices}"
+        f" --sort-results=true"
         f" --output={ARGS.log_dir}/{workload}.csv",
         workload=f"{workload}-{acc_dtype}-{out_dtype}",
     )
@@ -121,7 +122,8 @@ def main():
         'QK^TxVFlat': (1, 1, 24576, 543)
     }
 
-    for i, test_dict in enumerate([test_dict_train, test_dict_inference_w_o_KV, test_dict_inference_w_KV]):
+    # for i, test_dict in enumerate([test_dict_train, test_dict_inference_w_o_KV, test_dict_inference_w_KV]):
+    for i, test_dict in enumerate([test_dict_inference_w_KV]):
         for key, val in test_dict.items():
             WORKLOADS.update(
                 {

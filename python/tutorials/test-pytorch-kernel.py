@@ -1,8 +1,8 @@
 import torch 
 
 if __name__ == '__main__':
-    data_type = torch.float16
     iter_nums = 1
+    data_type = torch.float16
 
     test_dict_train = {
         'X x QKV w': (1, 8192, 4608, 12288),

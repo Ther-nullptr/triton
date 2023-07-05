@@ -290,17 +290,8 @@ def batched_matmul(a:torch.Tensor, b:torch.Tensor, activation=""):
     )
     return c
 
-
-# %%
-# Unit Test
-# ---------
-#
-# We can test our custom matrix multiplication operation against a native torch implementation (i.e., cuBLAS).
-if __name__ == '__main__':
-    iter_nums = 1
-    data_type = torch.float16
-
-    test_dict_train = {
+# test data
+test_dict_train = {
         'X x QKV w': (1, 8192, 4608, 12288),
         'Q x K^T': (192, 512, 512, 128),
         'QK^T x V': (192, 512, 128, 512),
@@ -311,54 +302,126 @@ if __name__ == '__main__':
         'QK^T x V Flat': (1, 512, 24576, 512)
     }
 
-    test_dict_inference_w_o_KV = {
-        'X x QKV w': (1, 8704, 4608, 12288),
-        'Q x K^T': (192, 543, 543, 128),
-        'QK^T x V': (192, 543, 128, 543),
-        'Proj': (1, 8688, 12288, 1536),
-        'FC1': (1, 8688, 6144, 12288),
-        'FC2': (1, 8688, 12288, 6144),
-        'Q x K^T Flat': (1, 543, 543, 24576),
-        'QK^T x V Flat': (1, 543, 24576, 543)
-    }
+test_dict_inference_w_o_KV = {
+    'X x QKV w': (1, 8704, 4608, 12288),
+    'Q x K^T': (192, 543, 543, 128),
+    'QK^T x V': (192, 543, 128, 543),
+    'Proj': (1, 8688, 12288, 1536),
+    'FC1': (1, 8688, 6144, 12288),
+    'FC2': (1, 8688, 12288, 6144),
+    'Q x K^T Flat': (1, 543, 543, 24576),
+    'QK^T x V Flat': (1, 543, 24576, 543)
+}
 
-    test_dict_inference_w_KV = {
-        'X x QKV w': (1, 16, 4608, 12288),
-        'Q x K^T': (192, 1, 543, 128),
-        'QK^T x V': (192, 1, 128, 543),
-        'Proj': (1, 16, 12288, 1536),
-        'FC1': (1, 16, 6144, 12288),
-        'FC2': (1, 16, 12288, 6144),
-        'Q x K^T Flat': (1, 1, 543, 24576),
-        'QK^T x V Flat': (1, 1, 24576, 543)
-    }
+test_dict_inference_w_KV = {
+    'X x QKV w': (1, 16, 4608, 12288),
+    'Q x K^T': (192, 1, 543, 128),
+    'QK^T x V': (192, 1, 128, 543),
+    'Proj': (1, 16, 12288, 1536),
+    'FC1': (1, 16, 6144, 12288),
+    'FC2': (1, 16, 12288, 6144),
+    'Q x K^T Flat': (1, 1, 543, 24576),
+    'QK^T x V Flat': (1, 1, 24576, 543)
+}
 
-    # warm up
-    x = torch.randn((2, 114, 514), dtype=data_type).cuda()
-    y = torch.randn((2, 514, 114), dtype=data_type).cuda()
-    torch_output = torch.bmm(x, y)
-    triton_output = batched_matmul(x, y)
-    print(f"triton_output={triton_output}")
-    print(f"torch_output={torch_output}")    
-    print(f"diff={triton_output - torch_output}")
-    print(f"sum_diff={torch.sum(triton_output - torch_output)}")
-    # if torch.allclose(triton_output, torch_output, atol=1e-2, rtol=0):
-    #     print("✅ Triton and Torch match")
-    # else:
-    #     print("❌ Triton and Torch differ")
+# %%
+# Unit Test
+# ---------
+#
+# We can test our custom matrix multiplication operation against a native torch implementation (i.e., cuBLAS).
+iter_nums = 1
+data_type = torch.float16
 
-    for test_dict in [test_dict_train, test_dict_inference_w_o_KV, test_dict_inference_w_KV]:
-        print('==============================')
-        for key, val in test_dict.items():
-            B, M, N, K = val
-            # test the time of torch.bmm
-            a = torch.randn((B, M, K), dtype=data_type).cuda()
-            b = torch.randn((B, K, N), dtype=data_type).cuda()
-            start = torch.cuda.Event(enable_timing=True)
-            start.record()
-            for i in range(iter_nums):
-                c = batched_matmul(a, b)
-            end = torch.cuda.Event(enable_timing=True)
-            end.record()
-            torch.cuda.synchronize()
-            print(f'batched_matmul {data_type} {key} {val} time: {start.elapsed_time(end)/iter_nums} ms', flush=True)
+# warm up
+x = torch.randn((2, 114, 514), dtype=data_type).cuda()
+y = torch.randn((2, 514, 114), dtype=data_type).cuda()
+torch_output = torch.bmm(x, y)
+triton_output = batched_matmul(x, y)
+print(f"triton_output={triton_output}")
+print(f"torch_output={torch_output}")    
+print(f"diff={triton_output - torch_output}")
+print(f"sum_diff={torch.sum(triton_output - torch_output)}")
+
+
+# train
+@triton.testing.perf_report(
+    triton.testing.Benchmark(
+        x_names=['shape'],
+        x_vals = [val for val in test_dict_train.values()],
+        line_arg='provider',
+        line_vals=['triton', 'torch'],
+        line_names=['triton', 'torch'],
+        styles=[('blue', '-'), ('green', '-')],
+        ylabel='ms',
+        plot_name='',
+        args={}
+    )
+)
+def benchmark_train(shape, provider):
+    B, M, N, K = shape
+    a = torch.randn((B, M, K), device='cuda', dtype=torch.float16)
+    b = torch.randn((B, K, N), device='cuda', dtype=torch.float16)
+    percentiles = [0.5, 0.2, 0.8]
+    if provider == 'torch':
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: torch.bmm(a, b), percentiles=percentiles)
+    if provider == 'triton':
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: batched_matmul(a, b), percentiles=percentiles)
+    return ms, min_ms, max_ms
+
+benchmark_train.run(show_plots=False, print_data=True, save_path='result/train/')
+
+
+# inference w/o KV
+@triton.testing.perf_report(
+    triton.testing.Benchmark(
+        x_names=['shape'],
+        x_vals = [val for val in test_dict_inference_w_o_KV.values()],
+        line_arg='provider',
+        line_vals=['triton', 'torch'],
+        line_names=['triton', 'torch'],
+        styles=[('blue', '-'), ('green', '-')],
+        ylabel='ms',
+        plot_name='',
+        args={}
+    )
+)
+def benchmark_inference_w_o_KV(shape, provider):
+    B, M, N, K = shape
+    a = torch.randn((B, M, K), device='cuda', dtype=torch.float16)
+    b = torch.randn((B, K, N), device='cuda', dtype=torch.float16)
+    percentiles = [0.5, 0.2, 0.8]
+    if provider == 'torch':
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: torch.bmm(a, b), percentiles=percentiles)
+    if provider == 'triton':
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: batched_matmul(a, b), percentiles=percentiles)
+    return ms, min_ms, max_ms
+
+benchmark_inference_w_o_KV.run(show_plots=False, print_data=True, save_path='result/inference_w_o_KV/')
+
+
+# inference w KV
+@triton.testing.perf_report(
+    triton.testing.Benchmark(
+        x_names=['shape'],
+        x_vals = [val for val in test_dict_inference_w_KV.values()],
+        line_arg='provider',
+        line_vals=['triton', 'torch'],
+        line_names=['triton', 'torch'],
+        styles=[('blue', '-'), ('green', '-')],
+        ylabel='ms',
+        plot_name='',
+        args={}
+    )
+)
+def benchmark_inference_w_KV(shape, provider):
+    B, M, N, K = shape
+    a = torch.randn((B, M, K), device='cuda', dtype=torch.float16)
+    b = torch.randn((B, K, N), device='cuda', dtype=torch.float16)
+    percentiles = [0.5, 0.2, 0.8]
+    if provider == 'torch':
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: torch.bmm(a, b), percentiles=percentiles)
+    if provider == 'triton':
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: batched_matmul(a, b), percentiles=percentiles)
+    return ms, min_ms, max_ms
+
+benchmark_inference_w_KV.run(show_plots=False, print_data=True, save_path='result/inference_w_KV/')

@@ -325,9 +325,9 @@ print(f"rel_diff={torch.sum(torch.abs(triton_output - torch_output)) / torch.sum
 
 @triton.testing.perf_report(
     triton.testing.Benchmark(
-        x_names=['M', 'N', 'K'],  # Argument names to use as an x-axis for the plot
+        x_names=['shape'],  # Argument names to use as an x-axis for the plot
         x_vals=[
-            128 * i for i in range(2, 33)
+            (10, 20, 30), (40, 50, 60), (70, 80, 90)
         ],  # Different possible values for `x_name`
         line_arg='provider',  # Argument name whose value corresponds to a different line in the plot
         # Possible values for `line_arg`
@@ -337,11 +337,12 @@ print(f"rel_diff={torch.sum(torch.abs(triton_output - torch_output)) / torch.sum
         # Line styles
         styles=[('green', '-'), ('blue', '-')],
         ylabel="TFLOPS",  # Label name for the y-axis
-        plot_name="matmul-performance",  # Name for the plot, used also as a file name for saving the plot.
+        plot_name='',  # Name for the plot, used also as a file name for saving the plot.
         args={},
     )
 )
-def benchmark(M, N, K, provider):
+def benchmark(shape, provider):
+    M, N, K = shape
     a = torch.randn((M, K), device='cuda', dtype=torch.float16)
     b = torch.randn((K, N), device='cuda', dtype=torch.float16)
     percentiles = [0.5, 0.2, 0.8]
@@ -352,5 +353,4 @@ def benchmark(M, N, K, provider):
     perf = lambda ms: 2 * M * N * K * 1e-12 / (ms * 1e-3)
     return perf(ms), perf(max_ms), perf(min_ms)
 
-
-# benchmark.run(show_plots=False, print_data=True, save_path='result/03-matrix-multiplication/')
+benchmark.run(show_plots=False, print_data=True, save_path='result/03-matrix-multiplication-tuple/')
