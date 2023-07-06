@@ -31,3 +31,4 @@ logs/
 *.csv
 
 cublas_test
+cublas_test_general

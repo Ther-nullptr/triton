@@ -8,7 +8,6 @@ def parse_args():
     args = argparse.ArgumentParser()
     args.add_argument("--acc-dtype", type=str, choices=["f16", "f32"], default="f32")
     args.add_argument("--out-dtype", type=str, choices=["f16", "f32"], default="f16")
-    args.add_argument("--split-k-slices", type=int, default=1)
     args.add_argument("--profiling-iterations", type=int, default=5)
     args.add_argument("--warmup-iterations", type=int, default=1)
     args.add_argument("--cutlass-home", type=str, default='/home/yujin/workspace/cutlass')
@@ -30,7 +29,6 @@ def _run_cutlass(instruction: str, workload: str):
     df.sort_values('GFLOPs', inplace=True, ascending=False)
     df.reset_index(inplace=True)
     print(f"[{workload}] max TFLOPs: {df['GFLOPs'][0] / 1000}, operation: {df['Operation'][0]}, runtime: {df['Runtime'][0]}, GB/s: {df['GB/s'][0]}")
-
 
 
 def _run_gemm(
@@ -90,18 +88,15 @@ WORKLOADS = {}
 
 def main():
     for n in [32, 64, 128, 256]:
-        for m, k in [(2048, 8192), (8192, 2048), (2752, 8192), (8192, 2752)]:
-            WORKLOADS.update(
-                {
-                    f"{m}-{n}-{k}": partial(
-                        GMM, workload=f"m{m}-n{n}-k{k}-ksep{ARGS.split_k_slices}", b=1, m=m, n=n, k=k
-                    )
-                }
-            )
-
-    # print(f"Accumulator type: {ARGS.acc_dtype}")
-    # print(f"Output type: {ARGS.out_dtype}")
-    # print(f"Split K slices: {ARGS.split_k_slices}")
+        for m, k in [(2048, 8192), (2752, 8192)]:
+            for k_slices in [1, 2, 4, 8, 16, 32]: 
+                WORKLOADS.update(
+                    {
+                        f"{m}-{n}-{k}-{k_slices}": partial(
+                            GMM, workload=f"m{m}-n{n}-k{k}-ksep{k_slices}", b=1, m=m, n=n, k=k, k_slices=k_slices
+                        )
+                    }
+                )
 
     for workload_name in WORKLOADS.keys():
         WORKLOADS.get(workload_name)(
@@ -109,7 +104,6 @@ def main():
             out_dtype=ARGS.out_dtype,
             warmup_iterations=ARGS.warmup_iterations,
             profiling_iterations=ARGS.profiling_iterations,
-            k_slices=ARGS.split_k_slices
         )
 
 if __name__ == "__main__":
