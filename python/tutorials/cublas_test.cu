@@ -63,10 +63,14 @@ float test_gemm(cublasHandle_t handle, int b, int m, int n, int k, T *A,
                     (end.tv_usec - start.tv_usec) * 0.001;
     }
   }
-  if (total_time > 0) {
-    printf("algo %d: %.3f ms\n", algo, total_time / (iteration - 1));
-  }
+//   if (total_time > 0) {
+//     printf("algo %d: %.3f ms\n", algo, total_time / (iteration - 1));
+//   }
   return total_time / (iteration - 1);
+}
+
+inline double tflops(int b, int m, int n, int k, float ms) {
+  return 2 * (static_cast<double>(b) * m * n * k) * 1e-9 / static_cast<double>(ms); // / static_cast<double>(ms);
 }
 
 struct Shape {
@@ -77,6 +81,7 @@ int main() {
   // initialize
   cublasHandle_t handle;
   cublasCreate(&handle);
+  setbuf(stdout, NULL);
 
   // test list of shape
   std::map<std::string, Shape> train_dict = {
@@ -155,8 +160,8 @@ int main() {
           algo_index = static_cast<cublasGemmAlgo_t>(algo);
         }
       }
-      printf("[%s] min_time: %.3f ms, best algorithm: %d\n", item.first.c_str(),
-             min_time, static_cast<int>(algo_index));
+      printf("[%s] min_time: %.3f ms, best algorithm: %d, tflops: %.3lf\n", item.first.c_str(),
+             min_time, static_cast<int>(algo_index), tflops(b, m, n, k, min_time));
       free_memory(hA, hB, hC);
     }
   }
