@@ -99,10 +99,6 @@ def main():
                 }
             )
 
-    # print(f"Accumulator type: {ARGS.acc_dtype}")
-    # print(f"Output type: {ARGS.out_dtype}")
-    # print(f"Split K slices: {ARGS.split_k_slices}")
-
     for workload_name in WORKLOADS.keys():
         WORKLOADS.get(workload_name)(
             acc_dtype=ARGS.acc_dtype,
