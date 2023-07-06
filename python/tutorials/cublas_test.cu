@@ -1,175 +1,165 @@
-#include <iostream>
-#include <string>
+#include <stdio.h>
+#include <sys/time.h>
+
 #include <map>
+#include <string>
 
 #include <cublas_v2.h>
 #include <cuda.h>
 #include <cuda_fp16.h>
+#include <cuda_profiler_api.h>
 #include <cuda_runtime.h>
 
-static std::initializer_list<cublasGemmAlgo_t> algoList = {
-    CUBLAS_GEMM_DEFAULT,
-    CUBLAS_GEMM_ALGO0,
-    CUBLAS_GEMM_ALGO1,
-    CUBLAS_GEMM_ALGO2,
-    CUBLAS_GEMM_ALGO3,
-    CUBLAS_GEMM_ALGO4,
-    CUBLAS_GEMM_ALGO5,
-    CUBLAS_GEMM_ALGO6,
-    CUBLAS_GEMM_ALGO7,
-    CUBLAS_GEMM_ALGO8,
-    CUBLAS_GEMM_ALGO9,
-    CUBLAS_GEMM_ALGO10,
-    CUBLAS_GEMM_ALGO11,
-    CUBLAS_GEMM_ALGO12,
-    CUBLAS_GEMM_ALGO13,
-    CUBLAS_GEMM_ALGO14,
-    CUBLAS_GEMM_ALGO15,
-    CUBLAS_GEMM_ALGO16,
-    CUBLAS_GEMM_ALGO17,
-    CUBLAS_GEMM_ALGO18,  // sliced 32x32
-    CUBLAS_GEMM_ALGO19,  // sliced 64x32
-    CUBLAS_GEMM_ALGO20,  // sliced 128x32
-    CUBLAS_GEMM_ALGO21,  // sliced 32x32  -splitK
-    CUBLAS_GEMM_ALGO22,  // sliced 64x32  -splitK
-    CUBLAS_GEMM_ALGO23,  // sliced 128x32 -splitK
-    CUBLAS_GEMM_DEFAULT_TENSOR_OP,
-    CUBLAS_GEMM_ALGO0_TENSOR_OP,
-    CUBLAS_GEMM_ALGO1_TENSOR_OP,
-    CUBLAS_GEMM_ALGO2_TENSOR_OP,
-    CUBLAS_GEMM_ALGO3_TENSOR_OP,
-    CUBLAS_GEMM_ALGO4_TENSOR_OP,
-    CUBLAS_GEMM_ALGO18,
-    CUBLAS_GEMM_ALGO19,
-    CUBLAS_GEMM_ALGO20,
-    CUBLAS_GEMM_ALGO21,
-    CUBLAS_GEMM_ALGO22,
-    CUBLAS_GEMM_ALGO23,
-    CUBLAS_GEMM_ALGO5_TENSOR_OP,
-    CUBLAS_GEMM_ALGO6_TENSOR_OP,
-    CUBLAS_GEMM_ALGO7_TENSOR_OP,
-    CUBLAS_GEMM_ALGO8_TENSOR_OP,
-    CUBLAS_GEMM_ALGO9_TENSOR_OP,
-    CUBLAS_GEMM_ALGO10_TENSOR_OP,
-    CUBLAS_GEMM_ALGO11_TENSOR_OP,
-    CUBLAS_GEMM_ALGO12_TENSOR_OP,
-    CUBLAS_GEMM_ALGO13_TENSOR_OP,
-    CUBLAS_GEMM_ALGO14_TENSOR_OP,
-    CUBLAS_GEMM_ALGO15_TENSOR_OP
-};
+template <typename T, typename S>
+void allocate_memory(int b, int m, int n, int k, T **A, T **B, S **C) {
+  cudaMallocManaged(A, b * m * k * sizeof(T));
+  cudaMallocManaged(B, b * k * n * sizeof(T));
+  cudaMallocManaged(C, b * m * n * sizeof(S));
+}
 
-struct Shape
-{
-    int b, m, n, k;
-};
+template <typename T, typename S> void free_memory(T *A, T *B, S *C) {
+  cudaFree(A);
+  cudaFree(B);
+  cudaFree(C);
+}
 
-int main()
-{
-    // initialize
-    cublasHandle_t handle;
-    cublasCreate(&handle);
+template <typename T, typename S>
+int cublas_gemm_ex(cublasHandle_t handle, cublasOperation_t transA,
+                          cublasOperation_t transB, int b, int m, int n, int k,
+                          T *A, T *B, S *C, int lda, int ldb, int ldc, S *alpha,
+                          S *beta, int algo) {
+  cudaDataType_t AType, BType, CType, ComputeType;
+  AType = BType = CType = ComputeType = CUDA_R_16F;
 
-    // test list of shape
-    std::map<std::string, Shape> train_dict = {
-        {"XxQKVw", {1, 8192, 4608, 12288}},
-        {"QxK^T", {192, 512, 512, 128}},
-        {"QK^TxV", {192, 512, 128, 512}},
-        {"Proj", {1, 8192, 12288, 1536}},
-        {"FC1", {1, 8192, 6144, 12288}},
-        {"FC2", {1, 8192, 12288, 6144}},
-        {"QxK^TFlat", {1, 512, 512, 24576}},
-        {"QK^TxVFlat", {1, 512, 24576, 512}}
-    };
+  cublasStatus_t status;
+  status = cublasGemmStridedBatchedEx(
+      handle, transA, transB, m, n, k, alpha, A, AType, lda, m * k, B, BType,
+      ldb, k * n, beta, C, CType, ldc, m * n, b, ComputeType,
+      static_cast<cublasGemmAlgo_t>(algo));
 
-    std::map<std::string, Shape> inference_w_o_KV_dict = {
-        {"XxQKVw", {1, 8704, 4608, 12288}},
-        {"QxK^T", {192, 543, 543, 128}},
-        {"QK^TxV", {192, 543, 128, 543}},
-        {"Proj", {1, 8688, 12288, 1536}},
-        {"FC1", {1, 8688, 6144, 12288}},
-        {"FC2", {1, 8688, 12288, 6144}},
-        {"QxK^TFlat", {1, 543, 543, 24576}},
-        {"QK^TxVFlat", {1, 543, 24576, 543}}
-    };
+  if (status == CUBLAS_STATUS_SUCCESS)
+    return 1;
+  else
+    return -1;
+}
 
-    std::map<std::string, Shape> inference_w_KV_dict = {
-        {"XxQKVw", {1, 16, 4608, 12288}},
-        {"QxK^T", {192, 1, 543, 128}},
-        {"QK^TxV", {192, 1, 128, 543}},
-        {"Proj", {1, 16, 12288, 1536}},
-        {"FC1", {1, 16, 6144, 12288}},
-        {"FC2", {1, 16, 12288, 6144}},
-        {"QxK^TFlat", {1, 1, 543, 24576}},
-        {"QK^TxVFlat", {1, 1, 24576, 543}}
-    };
-
-    // iterate the three dicts
-    for (const auto &dict : {train_dict, inference_w_o_KV_dict, inference_w_KV_dict})
-    {
-        std::cout << "=========================" << std::endl;
-        for (const auto &item : dict)
-        {
-            std::cout << "-------------------------" << std::endl;
-            std::cout << item.first << ":[" << item.second.b << "," << item.second.m << ","
-                      << item.second.n << "," << item.second.k << "]" << std::endl;
-            Shape shape = item.second;
-            int b = shape.b;
-            int m = shape.m;
-            int n = shape.n;
-            int k = shape.k;
-
-            // allocate memory
-            half *d_a, *d_b, *d_c;
-            cudaMallocManaged((void**)&d_a, sizeof(half) * m * k * b);
-            cudaMallocManaged((void**)&d_b, sizeof(half) * k * n * b);
-            cudaMallocManaged((void**)&d_c, sizeof(half) * m * n * b);
-
-            // randomly initialize data
-
-
-            // initialize data
-            half alpha = __float2half(1.0);
-            half beta = __float2half(0.0);
-
-            // test
-            int iteration = 1;
-            float min_time = 0xffff;
-            cublasGemmAlgo_t algo_index;
-            for (const auto &algo : algoList)
-            {
-                float total_time = 0.0;
-                for (int i = 0; i < iteration; i++)
-                {
-
-                    cudaEvent_t start, end;
-                    cudaEventCreate(&start);
-                    cudaEventCreate(&end);
-
-                    cudaEventRecord(start, 0);
-                    cublasGemmStridedBatchedEx(
-                        handle, CUBLAS_OP_N, CUBLAS_OP_T, m, n, k, &alpha, d_a, CUDA_R_16F, k,
-                        m * k, d_b, CUDA_R_16F, n, k * n, &beta, d_c, CUDA_R_16F, n, m * n,
-                        b, CUDA_R_16F, static_cast<cublasGemmAlgo_t>(algo));
-                    cudaEventRecord(end, 0);
-                    cudaEventSynchronize(end);
-                    float elapsed_time;
-                    cudaEventElapsedTime(&elapsed_time, start, end);
-                    total_time += elapsed_time;
-                }
-                float current_time = total_time / iteration;
-                std::cout << "algo:" << algo << " " << current_time << " ms" << std::endl;
-                if (current_time < min_time)
-                {
-                    min_time = current_time;
-                    algo_index = algo;
-                }
-            }
-            std::cout << "best:" << algo_index << " " << min_time << " ms" << std::endl;
-
-            // free memory
-            cudaFree(d_a);
-            cudaFree(d_b);
-            cudaFree(d_c);
-        }
+template <typename T, typename S>
+float test_gemm(cublasHandle_t handle, int b, int m, int n, int k, T *A,
+                       T *B, S *C, S *alpha, S *beta, int algo, int iteration) {
+  float total_time = 0;
+  for (int i = 0; i < iteration; ++i) {
+    struct timeval start, end;
+    cudaDeviceSynchronize();
+    cudaProfilerStart();
+    gettimeofday(&start, NULL);
+    int success =
+        cublas_gemm_ex(handle, CUBLAS_OP_N, CUBLAS_OP_N, b, n, m, k, B, A, C, n,
+                       k, n, alpha, beta, static_cast<cublasGemmAlgo_t>(algo));
+    cudaDeviceSynchronize();
+    gettimeofday(&end, NULL);
+    cudaProfilerStop();
+    if (success > 0 && i > 0) {
+      total_time += (end.tv_sec - start.tv_sec) * 1000 +
+                    (end.tv_usec - start.tv_usec) * 0.001;
     }
+  }
+  if (total_time > 0) {
+    printf("algo %d: %.3f ms\n", algo, total_time / (iteration - 1));
+  }
+  return total_time / (iteration - 1);
+}
+
+struct Shape {
+  int b, m, n, k;
+};
+
+int main() {
+  // initialize
+  cublasHandle_t handle;
+  cublasCreate(&handle);
+
+  // test list of shape
+  std::map<std::string, Shape> train_dict = {
+      {"1-XxQKVw", {1, 8192, 4608, 12288}},
+      {"2-QxK^T", {192, 512, 512, 128}},
+      {"3-QK^TxV", {192, 512, 128, 512}},
+      {"4-Proj", {1, 8192, 12288, 1536}},
+      {"5-FC1", {1, 8192, 6144, 12288}},
+      {"6-FC2", {1, 8192, 12288, 6144}},
+      {"7-QxK^TFlat", {1, 512, 512, 24576}},
+      {"8-QK^TxVFlat", {1, 512, 24576, 512}}};
+
+  std::map<std::string, Shape> inference_w_o_KV_dict = {
+      {"1-XxQKVw", {1, 8704, 4608, 12288}},
+      {"2-QxK^T", {192, 543, 543, 128}},
+      {"3-QK^TxV", {192, 543, 128, 543}},
+      {"4-Proj", {1, 8688, 12288, 1536}},
+      {"5-FC1", {1, 8688, 6144, 12288}},
+      {"6-FC2", {1, 8688, 12288, 6144}},
+      {"7-QxK^TFlat", {1, 543, 543, 24576}},
+      {"8-QK^TxVFlat", {1, 543, 24576, 543}}};
+
+  std::map<std::string, Shape> inference_w_KV_dict = {
+      {"1-XxQKVw", {1, 16, 4608, 12288}},  {"2-QxK^T", {192, 1, 543, 128}},
+      {"3-QK^TxV", {192, 1, 128, 543}},    {"4-Proj", {1, 16, 12288, 1536}},
+      {"5-FC1", {1, 16, 6144, 12288}},     {"6-FC2", {1, 16, 12288, 6144}},
+      {"7-QxK^TFlat", {1, 1, 543, 24576}}, {"8-QK^TxVFlat", {1, 1, 24576, 543}}};
+
+  for (const auto &dict :
+       {train_dict, inference_w_o_KV_dict, inference_w_KV_dict}) {
+    printf("=========================\n");
+    for (auto it = dict.begin(); it != dict.end(); ++it) {
+      auto item = *it;
+      printf("-------------------------\n");
+      printf("%s: [%d, %d, %d, %d]\n", item.first.c_str(), item.second.b,
+             item.second.m, item.second.n, item.second.k);
+
+      Shape shape = item.second;
+      int b = shape.b;
+      int m = shape.m;
+      int n = shape.n;
+      int k = shape.k;
+
+      int start_algo = CUBLAS_GEMM_DEFAULT;
+      int end_algo = CUBLAS_GEMM_ALGO23;
+      int start_algo_t_op = CUBLAS_GEMM_DEFAULT_TENSOR_OP;
+      int end_algo_t_op = CUBLAS_GEMM_ALGO15_TENSOR_OP;
+      int iteration = 100;
+
+      half *hA, *hB, *hC;
+      half h_alpha = __float2half_rn(1.0), h_beta = __float2half_rn(0.0);
+      allocate_memory(b, m, n, k, &hA, &hB, &hC);
+      for (int i = 0; i < m * k; ++i) {
+        hA[i] = __float2half_rn(float(i % 255 - 127) / 127);
+      }
+      for (int i = 0; i < k * n; ++i) {
+        hB[i] = __float2half_rn(float(i % 255 - 127) / 127);
+      }
+
+      printf(">>>>>>>>>>>>>>>>> test fp16 >>>>>>>>>>>>>>>>>\n");
+      float min_time = 0xffff;
+      cublasGemmAlgo_t algo_index;
+      for (int algo = start_algo; algo <= end_algo; ++algo) {
+        float current_time = test_gemm(handle, b, m, n, k, hA, hB, hC, &h_alpha,
+                                       &h_beta, algo, iteration);
+        if (current_time < min_time) {
+          min_time = current_time;
+          algo_index = static_cast<cublasGemmAlgo_t>(algo);
+        }
+      }
+      for (int algo = start_algo_t_op; algo <= end_algo_t_op; ++algo) {
+        float current_time = test_gemm(handle, b, m, n, k, hA, hB, hC, &h_alpha,
+                                       &h_beta, algo, iteration);
+        if (current_time < min_time) {
+          min_time = current_time;
+          algo_index = static_cast<cublasGemmAlgo_t>(algo);
+        }
+      }
+      printf("[%s] min_time: %.3f ms, best algorithm: %d\n", item.first.c_str(),
+             min_time, static_cast<int>(algo_index));
+      free_memory(hA, hB, hC);
+    }
+  }
+
+  return 0;
 }

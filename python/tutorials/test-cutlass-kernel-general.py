@@ -34,7 +34,7 @@ def _run_cutlass(instruction: str, workload: str):
     df = pd.read_csv(f"{ARGS.log_dir}/{workload}.gemm.csv")
     df.sort_values('GFLOPs', inplace=True, ascending=False)
     df.reset_index(inplace=True)
-    print(f"[{workload}] max GFLOPs: {df['GFLOPs'][0]}, operation: {df['Operation'][0]}, runtime: {df['Runtime'][0]}, GB/s: {df['GB/s'][0]}")
+    print(f"[{workload}] max TFLOPs: {df['TFLOPs'][0] / 1000}, operation: {df['Operation'][0]}, runtime: {df['Runtime'][0]}, GB/s: {df['GB/s'][0]}")
 
 
 
