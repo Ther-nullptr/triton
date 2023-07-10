@@ -311,7 +311,7 @@ def batched_matmul(a:torch.Tensor, b:torch.Tensor, activation=""):
         # Line styles
         styles=[('green', '-'), ('blue', '-')],
         ylabel="TFLOPS",  # Label name for the y-axis
-        plot_name="matmul-performance",  # Name for the plot, used also as a file name for saving the plot.
+        plot_name=f"matmul-performance-M-{args.block_m}-N-{args.block_n}-K-{args.block_k}-GM-{args.group_m}-S-{args.num_stages}-W-{args.num_warps}",  # Name for the plot. Used also as a file name for saving the plot.
         args={},
     )
 )
