@@ -32,3 +32,5 @@ logs/
 
 cublas_test
 cublas_test_general
+
+*.ncu-rep
