@@ -158,6 +158,7 @@ import triton.language as tl
 
 # argparse
 parser = argparse.ArgumentParser(description='Triton Matrix Multiplication')
+parser.add_argument('--b', type=int, default=16, metavar='B')
 parser.add_argument('--m', type=int, default=4096, metavar='M')
 parser.add_argument('--n', type=int, default=4096, metavar='N')
 parser.add_argument('--k', type=int, default=4096, metavar='K')
@@ -306,7 +307,7 @@ def batched_matmul(a:torch.Tensor, b:torch.Tensor, activation=""):
 # We can test our custom matrix multiplication operation against a native torch implementation (i.e., cuBLAS).
 
 torch.manual_seed(0)
-a = torch.randn((16, 512, 512), device='cuda', dtype=torch.float16)
-b = torch.randn((16, 512, 512), device='cuda', dtype=torch.float16)
+a = torch.randn((args.b, args.m, args.k), device='cuda', dtype=torch.float16)
+b = torch.randn((args.b, args.k, args.n), device='cuda', dtype=torch.float16)
 triton_output = batched_matmul(a, b)
 torch_output = torch.matmul(a, b)

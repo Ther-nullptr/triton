@@ -2,7 +2,7 @@ CUDA_HOME ?= /usr/local/cuda
 CU=$(CUDA_HOME)/bin/nvcc
 
 # for profiling
-PYTHON_FILE=03-matrix-multiplication-ncu-profiling
+PYTHON_FILE=03-2-batched-matrix-multiplication-ncu-profiling
 M=4096
 N=4096
 K=4096
@@ -15,7 +15,7 @@ NUM_WARPS=4
 ARCH=sm_80
 NCU=/opt/nvidia/nsight-compute/2023.1.0/ncu
 
-FILE_NAME=$(M)_$(N)_$(K)-$(BLOCK_M)_$(BLOCK_N)_$(BLOCK_K)_$(GROUP_M)-$(NUM_STAGES)_$(NUM_WARPS)
+FILE_NAME=M-$(M)_N-$(N)_K-$(K)-BM-$(BLOCK_M)_BN-$(BLOCK_N)_BK-$(BLOCK_K)_GM-$(GROUP_M)-S-$(NUM_STAGES)W-_$(NUM_WARPS)
 CMD_OPT=--m $(M) --n $(N) --k $(K) --block-m $(BLOCK_M) --block-n $(BLOCK_N) --block-k $(BLOCK_K) --group-m $(GROUP_M) --num-stages $(NUM_STAGES) --num-warps $(NUM_WARPS)
 
 # metrics for roofline
@@ -35,7 +35,7 @@ ncu:
 	$(NCU) $(NCU_FLAG) --target-processes all -f -o profile-$(PYTHON_FILE)-$(CMD_OPT) python $(PYTHON_FILE).py $(CMD_OPT)
 
 ncu_metrics:
-	$(NCU) $(NCU_FLAG) --target-processes all --metrics $(metrics) python $(PYTHON_FILE).py $(CMD_OPT) | tee csv/nsight-compute-$(PYTHON_FILE)-$(FILE_NAME).csv
+	$(NCU) $(NCU_FLAG) --target-processes all --metrics $(metrics) --csv --log-file x.csv python3 $(PYTHON_FILE).py $(CMD_OPT) | tee csv/nsight-compute-$(PYTHON_FILE)-$(FILE_NAME).csv
 
 ncu_roofline:
-	$(NCU) $(NCU_FLAG) --target-processes all $(roofline_section) -o roofline-$(PYTHON_FILE)-$(FILE_NAME) -f python $(PYTHON_FILE).py $(CMD_OPT) 
+	$(NCU) $(NCU_FLAG) --target-processes all $(roofline_section) -o ncu-rep/roofline-$(PYTHON_FILE)-$(FILE_NAME) -f python $(PYTHON_FILE).py $(CMD_OPT) 
