@@ -15,6 +15,7 @@ parameters = {
         'NW': None
     }
 
+
 def generate_regex(string, param_list):
     for param_index in param_list:
         param = parameters[param_index]
@@ -24,6 +25,7 @@ def generate_regex(string, param_list):
             string += f"{param}_"
     
     return string
+
 
 if __name__ == '__main__':
     csv_dir = '/home/yujin/workspace/triton/python/tutorials/csv'

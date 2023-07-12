@@ -158,16 +158,16 @@ import triton.language as tl
 
 # argparse
 parser = argparse.ArgumentParser(description='Triton Matrix Multiplication')
-parser.add_argument('--b', type=int, default=16, metavar='B')
+parser.add_argument('--b', type=int, default=1, metavar='B')
 parser.add_argument('--m', type=int, default=4096, metavar='M')
 parser.add_argument('--n', type=int, default=4096, metavar='N')
 parser.add_argument('--k', type=int, default=4096, metavar='K')
-parser.add_argument('--block-m', type=int, default=64, metavar='BM')
-parser.add_argument('--block-n', type=int, default=256, metavar='BN')
+parser.add_argument('--block-m', type=int, default=128, metavar='BM')
+parser.add_argument('--block-n', type=int, default=128, metavar='BN')
 parser.add_argument('--block-k', type=int, default=32, metavar='BK')
 parser.add_argument('--group-m', type=int, default=8, metavar='GM')
 parser.add_argument('--num-stages', type=int, default=4, metavar='S')
-parser.add_argument('--num-warps', type=int, default=4, metavar='W')
+parser.add_argument('--num-warps', type=int, default=2, metavar='W')
 
 args = parser.parse_args()
 
