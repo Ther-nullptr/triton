@@ -29,6 +29,9 @@ python/tutorials/result/
 *.log
 logs/
 *.csv
+csv/
+ncu-rep/
+picture/
 
 cublas_test
 cublas_test_general

@@ -27,8 +27,11 @@ L2_PEAK = 7817.
 HBM_PEAK = 1935.
 PERFORMANCE_PEAK = 234.
 
+fig = plt.figure(1, figsize=(10.67, 6.6))
+plt.clf()
+patch_handles = list()
 
-def roofline(filename, FLOPS, AIHBM, AIL2=None, AIL1=None, LABELS=None, flag='HBM'):
+def roofline(idx, tag, filename, FLOPS, AIHBM, AIL2=None, AIL1=None, LABELS=None, flag='all'):
 
     if not FLOPS:
         print('FLOPS can not be empty!')
@@ -45,14 +48,11 @@ def roofline(filename, FLOPS, AIHBM, AIL2=None, AIL1=None, LABELS=None, flag='HB
     if (flag != 'HBM') and (flag != 'L2') and (flag != 'L1') and (flag != 'all'):
         print('flag needs to be one of HBM, L2, L1, and all!')
         return
-    print(LABELS)
     LABELS = [LABELS]
 
     memRoofs = [('L1', L1_PEAK), ('L2', L2_PEAK),  ('HBM', HBM_PEAK)]
     cmpRoofs = [('Tensor', PERFORMANCE_PEAK)]
 
-    fig = plt.figure(1, figsize=(10.67, 6.6))
-    plt.clf()
     ax = fig.gca()
     ax.set_xscale('log')
     ax.set_yscale('log')
@@ -106,22 +106,22 @@ def roofline(filename, FLOPS, AIHBM, AIL2=None, AIL1=None, LABELS=None, flag='HB
     for i in range(len(AIHBM)):
         if flag == 'all':
             # plot a line with flops
-            ax.axhline(y=float(FLOPS[i]), c=colors[i % 10], ls='--', lw='1')
-            ax.text(xlim[-1]*1.1, float(FLOPS[i]), f'{FLOPS[i]/1000:.1f} TFLOP/s', fontsize=8, color=colors[i % 10])
+            ax.axhline(y=float(FLOPS[i]), c=colors[idx % 10], ls='--', lw='1')
+            ax.text(xlim[-1]*1.1, float(FLOPS[i]), f'{FLOPS[i]/1000:.1f} TFLOP/s', fontsize=8, color=colors[idx % 10])
              
-            ax.plot(float(AIL1[i]), float(FLOPS[i]), c=colors[i % 10], marker=styles[0],
+            ax.plot(float(AIL1[i]), float(FLOPS[i]), c=colors[idx % 10], marker=styles[0],
                     linestyle='None', ms=markersize, markerfacecolor='none',
-                    markeredgewidth=markerwidth, label=LABELS[i] if LABELS else "unknown")
+                    markeredgewidth=markerwidth, label=tag)
 
-            ax.plot(float(AIL2[i]), float(FLOPS[i]), c=colors[i % 10], marker=styles[1],
+            ax.plot(float(AIL2[i]), float(FLOPS[i]), c=colors[idx % 10], marker=styles[1],
                     linestyle='None', ms=markersize, markerfacecolor='none',
-                    markeredgewidth=markerwidth, label=LABELS[i] if LABELS else "unknown")
+                    markeredgewidth=markerwidth, label=tag)
 
-            ax.plot(float(AIHBM[i]), float(FLOPS[i]), c=colors[i % 10], marker=styles[2],
+            ax.plot(float(AIHBM[i]), float(FLOPS[i]), c=colors[idx % 10], marker=styles[2],
                     linestyle='None', ms=markersize, markerfacecolor='none',
-                    markeredgewidth=markerwidth, label=LABELS[i] if LABELS else "unknown")
+                    markeredgewidth=markerwidth, label=tag)
 
-            ax.text(xlim[0]*1.1, float(FLOPS[i]), f"L1 AI:{AIL1[i]:.1f}, {FLOPS[i] / roofline_boundary(AIL1[i], L1_PEAK) * 100:.2f}%; L2 AI:{AIL2[i]:.1f}, {FLOPS[i] / roofline_boundary(AIL2[i], L2_PEAK) * 100:.2f}%; HBM AI:{AIHBM[i]:.1f}, {FLOPS[i] / roofline_boundary(AIHBM[i], HBM_PEAK) * 100:.2f}%", fontsize=8, color=colors[i % 10])
+            ax.text(xlim[0]*1.1, float(FLOPS[i]), f"L1 AI:{AIL1[i]:.1f}, {FLOPS[i] / roofline_boundary(AIL1[i], L1_PEAK) * 100:.2f}%; L2 AI:{AIL2[i]:.1f}, {FLOPS[i] / roofline_boundary(AIL2[i], L2_PEAK) * 100:.2f}%; HBM AI:{AIHBM[i]:.1f}, {FLOPS[i] / roofline_boundary(AIHBM[i], HBM_PEAK) * 100:.2f}%", fontsize=8, color=colors[idx % 10])
         else:
             print(f"flag must be 'all'!")
             return
@@ -170,17 +170,14 @@ def roofline(filename, FLOPS, AIHBM, AIL2=None, AIL1=None, LABELS=None, flag='HB
         flag[0]) if 'all' not in flag else 3, bbox_to_anchor=(1, 0))
     ax.add_artist(leg1)
 
-    patch_handles = list()
-    for i in range(0, len(AIHBM)):
-        if FLOPS[i] > 0:
-            patch_handles.append(mpatches.Patch(
-                color=colors[i % 10], label=LABELS[i] if LABELS else "unknown"))
+    patch_handles.append(mpatches.Patch(
+                color=colors[idx % 10], label=tag))
 
     leg2 = plt.legend(handles=patch_handles, loc=4, ncol=1,
                       bbox_to_anchor=(1, 0.1), scatterpoints=1)
     ax.add_artist(leg2)
-
+    
     ax.text(xlim[0]*1.1, ylim[1]/1.1, '-'.join([filename, flag]),
             horizontalalignment='left', verticalalignment='top')
 
-    plt.savefig('_'.join([filename, flag])+'.png')
+    plt.savefig('picture/' + '_'.join([filename, flag])+'.png')

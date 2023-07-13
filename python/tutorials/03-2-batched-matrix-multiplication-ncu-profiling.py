@@ -299,6 +299,12 @@ def batched_matmul(a:torch.Tensor, b:torch.Tensor, activation=""):
     )
     return c
 
+'''same as
+dim3 block(num_warps * 32, 1);  
+dim3 grid((M + BLOCK_SIZE_M - 1) / BLOCK_SIZE_M, (N + BLOCK_SIZE_N - 1) / BLOCK_SIZE_N);
+matmul_kernel<<<grid,block>>>(Ad, Bd, Cd, M, N, K);
+'''
+
 
 # %%
 # Unit Test

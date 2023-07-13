@@ -8,11 +8,11 @@ if __name__ == '__main__':
 
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--name', type=str, default='label')
+    argparser.add_argument('--dir', type=str, default='.')
     args = argparser.parse_args()
 
-    datadir = '.'
-    files = [x for x in os.listdir(datadir) if x.endswith(
-        '.csv') and x.startswith('output')]
+    datadir = args.dir
+    files = [x for x in os.listdir(datadir) if x.endswith('.csv')]
     files.sort()
     files = [os.path.join(datadir, file) for file in files]
     dfs = {}
@@ -67,13 +67,11 @@ if __name__ == '__main__':
 
 
     tags = dfs.keys()
-    flags = ['all']  # 'HBM','L2','L1' or 'all'
-    for tag in tags:
-        for flag in flags:
-            dfm = dfs[tag]
-            LABELS = args.name
-            AIL1 = dfm['AI L1'].tolist()
-            AIL2 = dfm['AI L2'].tolist()
-            AIHBM = dfm['AI HBM'].tolist()
-            FLOPS = dfm['GFLOP/s'].tolist()
-            roofline(tag, FLOPS, AIHBM, AIL2, AIL1, LABELS, flag)
+    for idx, tag in enumerate(tags):
+        dfm = dfs[tag]
+        LABELS = args.name
+        AIL1 = dfm['AI L1'].tolist()
+        AIL2 = dfm['AI L2'].tolist()
+        AIHBM = dfm['AI HBM'].tolist()
+        FLOPS = dfm['GFLOP/s'].tolist()
+        roofline(idx, tag, LABELS, FLOPS, AIHBM, AIL2, AIL1)
