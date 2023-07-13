@@ -6,9 +6,19 @@ if [ -z "$exec_name" ]; then
     echo "Usage: $0 <exec_name>"
     exit 1
 fi
+
+# baseline
+metrics="dram__bytes.sum.peak_sustained,\
+dram__cycles_elapsed.avg.per_second,\
+lts__t_bytes.sum.peak_sustained,\
+lts__cycles_elapsed.avg.per_second,\
+l1tex__t_bytes.sum.peak_sustained,\
+l1tex__cycles_elapsed.avg.per_second,\
+sm__inst_executed_pipe_tensor.sum.peak_sustained,\
+sm__cycles_elapsed.avg.per_second,"
  
 # Time
-metrics="sm__cycles_elapsed.avg,\
+metrics+="sm__cycles_elapsed.avg,\
 sm__cycles_elapsed.avg.per_second,"
  
 # DP

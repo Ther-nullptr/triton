@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
+# hyper parameters
+
 font = {'size': 15}
 plt.rc('font', **font)
 
@@ -15,6 +17,16 @@ markersize = 10
 markerwidth = 2
 maxchar = 25
 
+nx = 10000
+xmin = -3
+xmax = 4
+ymin = 1
+ymax = 1000000
+
+L1_PEAK = 58776.
+L2_PEAK = 7817.
+HBM_PEAK = 1935.
+PERFORMANCE_PEAK = 234.
 
 def roofline(filename, FLOPS, AIHBM, AIL2=None, AIL1=None, LABELS=None, flag='HBM'):
 
@@ -35,8 +47,8 @@ def roofline(filename, FLOPS, AIHBM, AIL2=None, AIL1=None, LABELS=None, flag='HB
         return
     LABELS = [x[:maxchar] for x in LABELS]
 
-    memRoofs = [('L1', 58776.), ('L2', 7816.9),  ('HBM', 1935.267)]
-    cmpRoofs = [('Tensor', 234.5)]
+    memRoofs = [('L1', L1_PEAK), ('L2', L2_PEAK),  ('HBM', HBM_PEAK)]
+    cmpRoofs = [('Tensor', PERFORMANCE_PEAK)]
 
     fig = plt.figure(1, figsize=(10.67, 6.6))
     plt.clf()
@@ -45,12 +57,6 @@ def roofline(filename, FLOPS, AIHBM, AIL2=None, AIL1=None, LABELS=None, flag='HB
     ax.set_yscale('log')
     ax.set_xlabel('Arithmetic Intensity [FLOPs/Byte]')
     ax.set_ylabel('Performance [GFLOP/sec]')
-
-    nx = 10000
-    xmin = -3
-    xmax = 4
-    ymin = 1
-    ymax = 1000000
 
     ax.set_xlim(10**xmin, 10**xmax)
     ax.set_ylim(ymin, ymax)
