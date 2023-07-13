@@ -1,11 +1,19 @@
 #!/bin/bash 
 
-exec_name=$1
+B=1
+M=8192
+N=256
+K=2752
+BLOCK_M=128
+BLOCK_N=128
+BLOCK_K=32
+GROUP_M=8
+NUM_STAGES=4
+NUM_WARPS=4
 
-if [ -z "$exec_name" ]; then
-    echo "Usage: $0 <exec_name>"
-    exit 1
-fi
+exec_name=/home/yujin/workspace/triton/python/tutorials/03-2-batched-matrix-multiplication-ncu-profiling.py
+args="--b $B --m $M --n $N --k $K --block-m $BLOCK_M --block-n $BLOCK_N --block-k $BLOCK_K --group-m $GROUP_M --num-stages $NUM_STAGES --num-warps $NUM_WARPS"
+name="[${B},${M},${N},${K}]_[${BLOCK_M},${BLOCK_N},${BLOCK_K}]_[${GROUP_M},${NUM_STAGES},${NUM_WARPS}]"
 
 # baseline
 metrics="dram__bytes.sum.peak_sustained,\
@@ -45,5 +53,7 @@ lts__t_bytes.sum,\
 l1tex__t_bytes.sum"
  
  
-/opt/nvidia/nsight-compute/2023.1.0/ncu --metrics $metrics --csv --target-processes all python3 $exec_name > output.csv
+/opt/nvidia/nsight-compute/2023.1.0/ncu --metrics $metrics --csv --target-processes all python3 $exec_name $args > output.csv
 sed -i '/^==/d' output.csv
+
+python postprocess.py --name $name

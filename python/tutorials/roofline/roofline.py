@@ -1,4 +1,3 @@
-
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -13,7 +12,7 @@ colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',
 styles = ['o', 's', 'v', '^', 'D', ">", "<", "*", "h", "H",
           "+", "1", "2", "3", "4", "8", "p", "d", "|", "_", ".", ","]
 
-markersize = 10
+markersize = 5
 markerwidth = 2
 maxchar = 25
 
@@ -27,6 +26,7 @@ L1_PEAK = 58776.
 L2_PEAK = 7817.
 HBM_PEAK = 1935.
 PERFORMANCE_PEAK = 234.
+
 
 def roofline(filename, FLOPS, AIHBM, AIL2=None, AIL1=None, LABELS=None, flag='HBM'):
 
@@ -45,7 +45,8 @@ def roofline(filename, FLOPS, AIHBM, AIL2=None, AIL1=None, LABELS=None, flag='HB
     if (flag != 'HBM') and (flag != 'L2') and (flag != 'L1') and (flag != 'all'):
         print('flag needs to be one of HBM, L2, L1, and all!')
         return
-    LABELS = [x[:maxchar] for x in LABELS]
+    print(LABELS)
+    LABELS = [LABELS]
 
     memRoofs = [('L1', L1_PEAK), ('L2', L2_PEAK),  ('HBM', HBM_PEAK)]
     cmpRoofs = [('Tensor', PERFORMANCE_PEAK)]
@@ -96,46 +97,43 @@ def roofline(filename, FLOPS, AIHBM, AIL2=None, AIL1=None, LABELS=None, flag='HB
         y = x * roof
         ax.plot(x[:smem_ix_elbow[i]+1],
                 y[:smem_ix_elbow[i]+1], c='k', ls='-', lw='2')
+        
+    # a lambda function to calculate roofline boundary
+    # x: arithmetic intensity
+    def roofline_boundary(x, peak):
+        return min(1000 * PERFORMANCE_PEAK, peak * x)
 
     for i in range(len(AIHBM)):
-        if flag == 'L1':
+        if flag == 'all':
+            # plot a line with flops
+            ax.axhline(y=float(FLOPS[i]), c=colors[i % 10], ls='--', lw='1')
+            ax.text(xlim[-1]*1.1, float(FLOPS[i]), f'{FLOPS[i]/1000:.1f} TFLOP/s', fontsize=8, color=colors[i % 10])
+             
             ax.plot(float(AIL1[i]), float(FLOPS[i]), c=colors[i % 10], marker=styles[0],
                     linestyle='None', ms=markersize, markerfacecolor='none',
                     markeredgewidth=markerwidth, label=LABELS[i] if LABELS else "unknown")
-        elif flag == 'L2':
+
             ax.plot(float(AIL2[i]), float(FLOPS[i]), c=colors[i % 10], marker=styles[1],
                     linestyle='None', ms=markersize, markerfacecolor='none',
                     markeredgewidth=markerwidth, label=LABELS[i] if LABELS else "unknown")
-        elif flag == 'HBM':
+
             ax.plot(float(AIHBM[i]), float(FLOPS[i]), c=colors[i % 10], marker=styles[2],
                     linestyle='None', ms=markersize, markerfacecolor='none',
                     markeredgewidth=markerwidth, label=LABELS[i] if LABELS else "unknown")
-        elif flag == 'all':
-            ax.plot(float(AIL1[i]), float(FLOPS[i]), c=colors[i % 10], marker=styles[0],
-                    linestyle='None', ms=markersize, markerfacecolor='none',
-                    markeredgewidth=markerwidth, label=LABELS[i] if LABELS else "unknown")
-            ax.plot(float(AIL2[i]), float(FLOPS[i]), c=colors[i % 10], marker=styles[1],
-                    linestyle='None', ms=markersize, markerfacecolor='none',
-                    markeredgewidth=markerwidth, label=LABELS[i] if LABELS else "unknown")
-            ax.plot(float(AIHBM[i]), float(FLOPS[i]), c=colors[i % 10], marker=styles[2],
-                    linestyle='None', ms=markersize, markerfacecolor='none',
-                    markeredgewidth=markerwidth, label=LABELS[i] if LABELS else "unknown")
+
+            ax.text(xlim[0]*1.1, float(FLOPS[i]), f"L1 AI:{AIL1[i]:.1f}, {FLOPS[i] / roofline_boundary(AIL1[i], L1_PEAK) * 100:.2f}%; L2 AI:{AIL2[i]:.1f}, {FLOPS[i] / roofline_boundary(AIL2[i], L2_PEAK) * 100:.2f}%; HBM AI:{AIHBM[i]:.1f}, {FLOPS[i] / roofline_boundary(AIHBM[i], HBM_PEAK) * 100:.2f}%", fontsize=8, color=colors[i % 10])
+        else:
+            print(f"flag must be 'all'!")
+            return
 
     marker_handles = []
-
-    if flag == 'L1':
-        marker_handles.append(ax.plot([], [], c='k', marker=styles[0], linestyle='None', ms=markersize,
-                                      markerfacecolor='none', markeredgewidth=markerwidth, label=memRoofs[0][0])[0])
-    elif flag == 'L2':
-        marker_handles.append(ax.plot([], [], c='k', marker=styles[1], linestyle='None', ms=markersize,
-                                      markerfacecolor='none', markeredgewidth=markerwidth, label=memRoofs[1][0])[0])
-    elif flag == 'HBM':
-        marker_handles.append(ax.plot([], [], c='k', marker=styles[2], linestyle='None', ms=markersize,
-                                      markerfacecolor='none', markeredgewidth=markerwidth, label=memRoofs[2][0])[0])
-    elif flag == 'all':
+    if flag == 'all':
         for i in range(len(memRoofs)):
             marker_handles.append(ax.plot([], [], c='k', marker=styles[i], linestyle='None', ms=markersize,
-                                  markerfacecolor='none', markeredgewidth=markerwidth, label=memRoofs[i][0])[0])
+                                  markerfacecolor='none', markeredgewidth=markerwidth, label=memRoofs[i][0])[0])      
+    else:
+        print(f"flag must be 'all'!")
+        return
 
     for roof in cmpRoofs:
         ax.text(x[-ixx], roof[1]*1024,
@@ -180,6 +178,7 @@ def roofline(filename, FLOPS, AIHBM, AIL2=None, AIL1=None, LABELS=None, flag='HB
 
     leg2 = plt.legend(handles=patch_handles, loc=4, ncol=1,
                       bbox_to_anchor=(1, 0.1), scatterpoints=1)
+    ax.add_artist(leg2)
 
     ax.text(xlim[0]*1.1, ylim[1]/1.1, '-'.join([filename, flag]),
             horizontalalignment='left', verticalalignment='top')
