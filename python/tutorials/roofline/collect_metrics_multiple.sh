@@ -1,20 +1,20 @@
 #!/bin/bash 
 
 B=1
-M=8192
+M=2048
 N=32
-K=2048
+K=8192
 BLOCK_M=128
 BLOCK_N=128
 BLOCK_K=32
 GROUP_M=8
 NUM_STAGES=4
-NUM_WARPS=16
+NUM_WARPS=4
 
 exec_name=/home/yujin/workspace/triton/python/tutorials/03-2-batched-matrix-multiplication-ncu-profiling.py
 args="--b $B --m $M --n $N --k $K --block-m $BLOCK_M --block-n $BLOCK_N --block-k $BLOCK_K --group-m $GROUP_M --num-stages $NUM_STAGES --num-warps $NUM_WARPS"
 csv_name="[${B},${M},${N},${K}]_[${BLOCK_M},${BLOCK_N},${BLOCK_K}]_[${GROUP_M},${NUM_STAGES},${NUM_WARPS}]"
-picture_name=group5
+picture_name=group7
 
 # if the first argument is "plot", then plot the csv file
 if [ $# -eq 1 ]; then

@@ -69,9 +69,9 @@ if __name__ == '__main__':
     tags = dfs.keys()
     for idx, tag in enumerate(tags):
         dfm = dfs[tag]
-        LABELS = args.name
+        filename = args.name
         AIL1 = dfm['AI L1'].tolist()
         AIL2 = dfm['AI L2'].tolist()
         AIHBM = dfm['AI HBM'].tolist()
         FLOPS = dfm['GFLOP/s'].tolist()
-        roofline(idx, tag, LABELS, FLOPS, AIHBM, AIL2, AIL1)
+        roofline(idx, tag, filename, FLOPS, AIHBM, AIL2, AIL1)
