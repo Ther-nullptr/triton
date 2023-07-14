@@ -51,8 +51,38 @@ metrics+="sm__inst_executed_pipe_tensor.sum,"
 # DRAM, L2 and L1
 metrics+="dram__bytes.sum,\
 lts__t_bytes.sum,\
-l1tex__t_bytes.sum"
- 
+l1tex__t_bytes.sum,"
+
+# ld
+metrics+="sm__sass_inst_executed_op_ld.avg.peak_sustained,\
+sm__sass_inst_executed_op_ld.avg,\
+sm__sass_inst_executed_op_ld.avg.peak_sustained_active,\
+sm__sass_inst_executed_op_ld.max.per_cycle_active,\
+sm__sass_inst_executed_op_ld.max.pct_of_peak_sustained_active,"
+
+# st
+metrics+="sm__sass_inst_executed_op_st.avg.peak_sustained,\
+sm__sass_inst_executed_op_st.avg,\
+sm__sass_inst_executed_op_st.avg.peak_sustained_active,\
+sm__sass_inst_executed_op_st.max.per_cycle_active,\
+sm__sass_inst_executed_op_st.max.pct_of_peak_sustained_active,"
+
+# ldsm
+metrics+="sm__sass_inst_executed_op_ldsm.avg.peak_sustained,\
+sm__sass_inst_executed_op_ldsm.avg,\
+sm__sass_inst_executed_op_ldsm.avg.peak_sustained_active,\
+sm__sass_inst_executed_op_ldsm.max.per_cycle_active,\
+sm__sass_inst_executed_op_ldsm.max.pct_of_peak_sustained_active,"
+
+# stream multiprocessor
+metrics+="sm__inst_executed_pipe_tensor.avg.peak_sustained,\
+sm__inst_executed_pipe_tensor.avg.peak_sustained_active,\
+sm__inst_executed_pipe_tensor.max.pct_of_peak_sustained_active,\
+sm__inst_executed_pipe_tensor.max.per_cycle_active,"
+
+# cycles
+metrics+="gpc__cycles_elapsed.avg.peak_sustained"
+
  
 /opt/nvidia/nsight-compute/2023.1.0/ncu --metrics $metrics --csv --target-processes all python3 $exec_name $args > output.csv
 sed -i '/^==/d' output.csv

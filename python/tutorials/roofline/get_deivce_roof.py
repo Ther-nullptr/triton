@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
 
     tags = dfs.keys()
-    flags = ['all']  # 'HBM','L2','L1' or 'all'
+    flags = ['all']  # 'HBM','L2','L1' or 'all'  
     
     for tag in tags:
         for flag in flags:
