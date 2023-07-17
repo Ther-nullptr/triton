@@ -36,5 +36,8 @@ picture/
 cublas_test
 cublas_test_general
 
+shared_lat
+shared_bw
+
 *.ncu-rep
 *.png
