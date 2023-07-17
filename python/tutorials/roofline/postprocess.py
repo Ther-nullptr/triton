@@ -1,5 +1,4 @@
 import os
-import numpy as np
 import pandas as pd
 import argparse
 from roofline import roofline
@@ -22,7 +21,7 @@ if __name__ == '__main__':
 
         df = pd.read_csv(file)
         df = df[df.ID==2]
-        df['Metric Value'] = df['Metric Value'].apply(lambda x: float(x.replace(',', '')))
+        df['Metric Value'] = df['Metric Value'].apply(lambda x: float(x.replace(',', '')) if type(x) == str else float(x))
         dft = df.groupby(['Kernel Name', 'Metric Name']).sum()
         dfmetric = pd.pivot_table(
             dft, index='Kernel Name', columns='Metric Name', values='Metric Value')

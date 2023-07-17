@@ -74,6 +74,10 @@ sm__sass_inst_executed_op_ldsm.avg.peak_sustained_active,\
 sm__sass_inst_executed_op_ldsm.max.per_cycle_active,\
 sm__sass_inst_executed_op_ldsm.max.pct_of_peak_sustained_active,"
 
+# shared memory
+metrics+="sm__sass_inst_executed_op_shared.avg,\
+sm__sass_inst_executed_op_shared.avg.per_cycle_active,"
+
 # stream multiprocessor
 metrics+="sm__inst_executed_pipe_tensor.avg.peak_sustained,\
 sm__inst_executed_pipe_tensor.avg.peak_sustained_active,\
@@ -84,7 +88,7 @@ sm__inst_executed_pipe_tensor.max.per_cycle_active,"
 metrics+="gpc__cycles_elapsed.avg.peak_sustained"
 
  
-/opt/nvidia/nsight-compute/2023.1.0/ncu --metrics $metrics --csv --target-processes all python3 $exec_name $args > output.csv
+/opt/nvidia/nsight-compute/2023.1.0/ncu --metrics $metrics --csv --target-processes all python3 $exec_name $args | tee output.csv
 sed -i '/^==/d' output.csv
 
-python postprocess.py --name $name
+python postprocess_little.py --name $name

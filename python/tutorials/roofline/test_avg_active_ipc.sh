@@ -19,11 +19,15 @@ name="[${B},${M},${N},${K}]_[${BLOCK_M},${BLOCK_N},${BLOCK_K}]_[${GROUP_M},${NUM
 # extract method: ncu --query-metrics | grep sm__sass_inst_executed_op | sed 's/^\([^[:blank:]]*\).*/\1,/'
 # ncu --query-metrics | grep sm__inst_executed | sed 's/^\([^[:blank:]]*\).*/\1,/'
 # ncu --query-metrics | grep sm__sass_data_bytes | sed 's/^\([^[:blank:]]*\).*/\1,/'
-metrics="gpc__cycles_elapsed.max,\
+metrics="gpc__cycles_elapsed.avg,\
 sm__sass_inst_executed.avg,\
 sm__sass_inst_executed.avg.peak_sustained,\
 sm__sass_inst_executed.avg.peak_sustained_active,\
 sm__sass_inst_executed.avg.per_cycle_active,\
+sm__pipe_shared_cycles_active.avg,\
+sm__pipe_shared_cycles_active.avg.peak_sustained_active,\
+sm__pipe_shared_cycles_active.avg.peak_sustained,\
+sm__pipe_shared_cycles_active.avg.per_cycle_active,\
 sm__sass_inst_executed_memdesc_explicit.avg.peak_sustained_active,\
 sm__sass_inst_executed_memdesc_explicit_hitprop_evict_first.avg.peak_sustained_active,\
 sm__sass_inst_executed_memdesc_explicit_hitprop_evict_last.avg.peak_sustained_active,\

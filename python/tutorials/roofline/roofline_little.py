@@ -17,22 +17,22 @@ markerwidth = 2
 maxchar = 25
 
 nx = 10000
-xmin = -3
-xmax = 4
-ymin = 1
-ymax = 1000000
+xmin = 3
+xmax = 10
+ymin = 0.01
+ymax = 10
 
-Latency =  1. # ns
-PeakIPC = 2.
+Latency = 29.02 # shared_memory, cycles
+PeakIPC = 1.
 
 fig = plt.figure(1, figsize=(10.67 * 2, 6.6 * 2))
 plt.clf()
 marker_handles = list()
 patch_handles = list()
 
-def roofline(idx, tag, filename, ActiveInsts, PracticalIPC):
+def roofline_little(idx, tag, filename, ActiveInsts, PracticalIPC):
 
-    latencyRoofs = [('Latency', Latency)]
+    latencyRoofs = [('Latency', 1. / Latency)]
     ipcRoofs = [('Tensor', PeakIPC)]
 
     ax = fig.gca()
@@ -58,20 +58,20 @@ def roofline(idx, tag, filename, ActiveInsts, PracticalIPC):
     if idx == 0:
         for i, roof in enumerate(ipcRoofs):
             for ix in range(1, nx):
-                if float(latencyRoofs[0][1] * x[ix]) >= roof[1]*1024 and (latencyRoofs[0][1] * x[ix-1]) < roof[1]*1024:
+                if float(latencyRoofs[0][1] * x[ix]) >= roof[1] and (latencyRoofs[0][1] * x[ix-1]) < roof[1]:
                     ipc_x_elbow.append(x[ix-1])
                     ipc_ix_elbow.append(ix-1)
                     break
 
         for i, roof in enumerate(latencyRoofs):
             for ix in range(1, nx):
-                if (ipcRoofs[0][1]*1024 <= roof[1] * x[ix] and ipcRoofs[0][1]*1024 > roof[1] * x[ix-1]):
+                if (ipcRoofs[0][1] <= roof[1] * x[ix] and ipcRoofs[0][1] > roof[1] * x[ix-1]):
                     inst_x_elbow.append(x[ix-1])
                     inst_ix_elbow.append(ix-1)
                     break
 
         for i in range(len(ipcRoofs)):
-            roof = ipcRoofs[i][1]*1024
+            roof = ipcRoofs[i][1]
             y = np.ones(len(x)) * roof
             ax.plot(x[ipc_ix_elbow[i]:],
                     y[ipc_ix_elbow[i]:], c='k', ls='-', lw='2')
@@ -85,7 +85,7 @@ def roofline(idx, tag, filename, ActiveInsts, PracticalIPC):
                                     markerfacecolor='none', markeredgewidth=markerwidth, label=latencyRoofs[i][0])[0])
 
         for roof in ipcRoofs:
-            ax.text(x[-ixx], roof[1]*1024,
+            ax.text(x[-ixx], roof[1],
                     roof[0] + ': ' + '{0:.1f}'.format(roof[1]) + ' (IPC)',
                     horizontalalignment='right',
                     verticalalignment='bottom')
@@ -96,7 +96,7 @@ def roofline(idx, tag, filename, ActiveInsts, PracticalIPC):
             if x[ixx]*roof[1] > ymin:
                 ax.text(x[ixx], x[ixx]*roof[1]*(1+0.25*np.sin(ang)**2),
                         roof[0] + ': ' +
-                        '{0:.1f}'.format(float(roof[1])) + ' ns',
+                        '{0:.1f}'.format(float(roof[1])) + ' cycles',
                         horizontalalignment='left',
                         verticalalignment='bottom',
                         rotation=180/np.pi*ang)
