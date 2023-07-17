@@ -36,6 +36,8 @@ if __name__ == '__main__':
         dfmetric['Peak IPC'] = dfmetric[f'{args.type}.avg.peak_sustained']
         dfmetric['Active Instructions'] = dfmetric[f'{args.type}.max.per_cycle_active']
         # TODO and latency
+        dfmetric['Practical IPC'] = dfmetric['Active Instructions'] / dfmetric['Peak IPC']
+        dfmetric['Latency'] = dfmetric['Time'] / dfmetric['Active Instructions']
 
         dfs[tag] = dfmetric
 
@@ -46,5 +48,6 @@ if __name__ == '__main__':
         filename = args.name
         PeakIPC = dfm['Peak IPC'].tolist()
         ActiveInsts = dfm['Active Instructions'].tolist()
+        PracticalIPC = dfm['Practical IPC'].tolist()
         Latency = dfm['Latency'].tolist()
-        roofline_little(idx, tag, filename, PeakIPC, ActiveInsts, Latency)
+        roofline_little(idx, tag, filename, PeakIPC, ActiveInsts, PracticalIPC, Latency)

@@ -22,20 +22,18 @@ xmax = 4
 ymin = 1
 ymax = 1000000
 
-L1_PEAK = 58776.
-L2_PEAK = 7817.
-HBM_PEAK = 1935.
-PERFORMANCE_PEAK = 234.
+Latency =  1. # ns
+PeakIPC = 2.
 
 fig = plt.figure(1, figsize=(10.67 * 2, 6.6 * 2))
 plt.clf()
 marker_handles = list()
 patch_handles = list()
 
-def roofline(idx, tag, filename, PeakIPC, ActiveInsts, Latency):
+def roofline(idx, tag, filename, ActiveInsts, PracticalIPC):
 
     latencyRoofs = [('Latency', Latency)]
-    ipcRoofs = [('Tensor', PERFORMANCE_PEAK)]
+    ipcRoofs = [('Tensor', PeakIPC)]
 
     ax = fig.gca()
     ax.set_xscale('log')
@@ -50,10 +48,10 @@ def roofline(idx, tag, filename, PeakIPC, ActiveInsts, Latency):
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
 
-    scomp_x_elbow = []
-    scomp_ix_elbow = []
-    smem_x_elbow = []
-    smem_ix_elbow = []
+    ipc_x_elbow = []
+    ipc_ix_elbow = []
+    inst_x_elbow = []
+    inst_ix_elbow = []
 
     # plot the base roofline
     x = np.logspace(xmin, xmax, nx)
@@ -61,34 +59,34 @@ def roofline(idx, tag, filename, PeakIPC, ActiveInsts, Latency):
         for i, roof in enumerate(ipcRoofs):
             for ix in range(1, nx):
                 if float(latencyRoofs[0][1] * x[ix]) >= roof[1]*1024 and (latencyRoofs[0][1] * x[ix-1]) < roof[1]*1024:
-                    scomp_x_elbow.append(x[ix-1])
-                    scomp_ix_elbow.append(ix-1)
+                    ipc_x_elbow.append(x[ix-1])
+                    ipc_ix_elbow.append(ix-1)
                     break
 
         for i, roof in enumerate(latencyRoofs):
             for ix in range(1, nx):
                 if (ipcRoofs[0][1]*1024 <= roof[1] * x[ix] and ipcRoofs[0][1]*1024 > roof[1] * x[ix-1]):
-                    smem_x_elbow.append(x[ix-1])
-                    smem_ix_elbow.append(ix-1)
+                    inst_x_elbow.append(x[ix-1])
+                    inst_ix_elbow.append(ix-1)
                     break
 
         for i in range(len(ipcRoofs)):
             roof = ipcRoofs[i][1]*1024
             y = np.ones(len(x)) * roof
-            ax.plot(x[scomp_ix_elbow[i]:],
-                    y[scomp_ix_elbow[i]:], c='k', ls='-', lw='2')
+            ax.plot(x[ipc_ix_elbow[i]:],
+                    y[ipc_ix_elbow[i]:], c='k', ls='-', lw='2')
 
         for i in range(len(latencyRoofs)):
             roof = latencyRoofs[i][1]
             y = x * roof
-            ax.plot(x[:smem_ix_elbow[i]+1],
-                    y[:smem_ix_elbow[i]+1], c='k', ls='-', lw='2')
+            ax.plot(x[:inst_ix_elbow[i]+1],
+                    y[:inst_ix_elbow[i]+1], c='k', ls='-', lw='2')
             marker_handles.append(ax.plot([], [], c='k', marker=styles[i], linestyle='None', ms=markersize,
                                     markerfacecolor='none', markeredgewidth=markerwidth, label=latencyRoofs[i][0])[0])
 
         for roof in ipcRoofs:
             ax.text(x[-ixx], roof[1]*1024,
-                    roof[0] + ': ' + '{0:.1f}'.format(roof[1]) + ' TFLOP/s',
+                    roof[0] + ': ' + '{0:.1f}'.format(roof[1]) + ' (IPC)',
                     horizontalalignment='right',
                     verticalalignment='bottom')
 
@@ -98,7 +96,7 @@ def roofline(idx, tag, filename, PeakIPC, ActiveInsts, Latency):
             if x[ixx]*roof[1] > ymin:
                 ax.text(x[ixx], x[ixx]*roof[1]*(1+0.25*np.sin(ang)**2),
                         roof[0] + ': ' +
-                        '{0:.1f}'.format(float(roof[1])) + ' GB/s',
+                        '{0:.1f}'.format(float(roof[1])) + ' ns',
                         horizontalalignment='left',
                         verticalalignment='bottom',
                         rotation=180/np.pi*ang)
@@ -112,33 +110,25 @@ def roofline(idx, tag, filename, PeakIPC, ActiveInsts, Latency):
                         break
                 ax.text(x[ixx+ymin_ix_elbow[0]], x[ixx+ymin_ix_elbow[0]]*roof[1]*(1+0.25*np.sin(ang)**2),
                         roof[0] + ': ' +
-                        '{0:.1f}'.format(float(roof[1])) + ' GB/s',
+                        '{0:.1f}'.format(float(roof[1])) + ' ns',
                         horizontalalignment='left',
                         verticalalignment='bottom',
                         rotation=180/np.pi*ang)
         
     # a lambda function to calculate roofline boundary
     # x: arithmetic intensity
-    roofline_boundary = lambda x, peak : min(1000 * PERFORMANCE_PEAK, peak * x)
+    roofline_boundary = lambda x, peak : min(1000 * PeakIPC, peak * x)
 
-    for i in range(len(AIHBM)):
+    for i in range(len(ActiveInsts)):
         # plot a line with ActiveInsts
         ax.axhline(y=float(ActiveInsts[i]), c=colors[idx % 10], ls='--', lw='1')
-        ax.text(xlim[-1]*1.1, float(ActiveInsts[i]), f'{ActiveInsts[i]/1000:.1f} TFLOP/s', fontsize=8, color=colors[idx % 10])
-            
-        ax.plot(float(AIL1[i]), float(ActiveInsts[i]), c=colors[idx % 10], marker=styles[0],
+        ax.text(xlim[-1]*1.1, float(ActiveInsts[i]), f'{ActiveInsts[i]:.1f}', fontsize=8, color=colors[idx % 10])
+
+        ax.plot(float(ActiveInsts[i]), float(ActiveInsts[i]), c=colors[idx % 10], marker=styles[2],
                 linestyle='None', ms=markersize, markerfacecolor='none',
                 markeredgewidth=markerwidth, label=tag)
 
-        ax.plot(float(AIL2[i]), float(ActiveInsts[i]), c=colors[idx % 10], marker=styles[1],
-                linestyle='None', ms=markersize, markerfacecolor='none',
-                markeredgewidth=markerwidth, label=tag)
-
-        ax.plot(float(AIHBM[i]), float(ActiveInsts[i]), c=colors[idx % 10], marker=styles[2],
-                linestyle='None', ms=markersize, markerfacecolor='none',
-                markeredgewidth=markerwidth, label=tag)
-
-        ax.text(xlim[0]*1.1, float(ActiveInsts[i]), f"L1 AI:{AIL1[i]:.1f}FLOPSs/Byte, {ActiveInsts[i] / roofline_boundary(AIL1[i], L1_PEAK) * 100:.2f}%; L2 AI:{AIL2[i]:.1f}FLOPSs/Byte, {ActiveInsts[i] / roofline_boundary(AIL2[i], L2_PEAK) * 100:.2f}%; HBM AI:{AIHBM[i]:.1f}FLOPSs/Byte, {ActiveInsts[i] / roofline_boundary(AIHBM[i], HBM_PEAK) * 100:.2f}%", fontsize=10, color=colors[idx % 10])
+        ax.text(xlim[0]*1.1, float(PracticalIPC[i]), f"Active Instructions: {ActiveInsts[i]:.1f}, {PracticalIPC[i] / roofline_boundary(ActiveInsts[i], Latency) * 100:.2f}%", fontsize=10, color=colors[idx % 10])
 
 
     leg1 = plt.legend(handles=marker_handles, loc='lower right', ncol=3, bbox_to_anchor=(1, 0))
@@ -152,4 +142,4 @@ def roofline(idx, tag, filename, PeakIPC, ActiveInsts, Latency):
     
     ax.text(xlim[0]*1.1, ylim[1]/1.1, filename, horizontalalignment='left', verticalalignment='top')
 
-    plt.savefig('picture/' + filename +'.png')
+    plt.savefig('picture/' + filename + '.png')

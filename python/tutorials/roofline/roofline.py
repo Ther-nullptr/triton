@@ -152,4 +152,4 @@ def roofline(idx, tag, filename, FLOPS, AIHBM, AIL2, AIL1):
     
     ax.text(xlim[0]*1.1, ylim[1]/1.1, filename, horizontalalignment='left', verticalalignment='top')
 
-    plt.savefig('picture/' + filename +'.png')
+    plt.savefig('picture/' + filename + '.png')
