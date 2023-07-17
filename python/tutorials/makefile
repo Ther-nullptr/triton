@@ -4,9 +4,9 @@ CU=$(CUDA_HOME)/bin/nvcc
 # for profiling
 PYTHON_FILE=03-2-batched-matrix-multiplication-ncu-profiling
 B=1
-M=4096
-N=4096
-K=4096
+M=2048
+N=32
+K=8192
 BLOCK_M=128
 BLOCK_N=128
 BLOCK_K=32
@@ -32,7 +32,7 @@ metrics_shared_mem = smsp__sass_data_bytes_mem_shared.avg,smsp__sass_data_bytes_
 metrics := $(metrics_time)$(metrics_throughput)$(metrics_occupancy)$(metrics_shared_mem)
 metrics2 = sm__inst_executed_pipe_tensor.sum.peak_sustained,sm__cycles_elapsed.avg.per_second,dram__bytes.sum.peak_sustained,dram__cycles_elapsed.avg.per_second,lts__t_bytes.sum.peak_sustained,lts__cycles_elapsed.avg.per_second,l1tex__t_bytes.sum.peak_sustained,l1tex__cycles_elapsed.avg.per_second
 
-roofline_section ?= --section SpeedOfLight --section LaunchStats --section SpeedOfLight_HierarchicalTensorRooflineChartA100 --section Occupancy --section MemoryWorkloadAnalysis_Chart --section MemoryWorkloadAnalysis_Tables --section ComputeWorkloadAnalysis --section InstructionStats --section WarpStateStats 
+roofline_section ?= --section SpeedOfLight --section LaunchStats --section SpeedOfLight_HierarchicalTensorRooflineChart --section Occupancy --section MemoryWorkloadAnalysis_Chart --section MemoryWorkloadAnalysis_Tables --section ComputeWorkloadAnalysis --section InstructionStats --section WarpStateStats 
 
 ncu:
 	$(NCU) $(NCU_FLAG) --target-processes all -f -o profile-$(PYTHON_FILE)-$(CMD_OPT) python $(PYTHON_FILE).py $(CMD_OPT)
