@@ -153,3 +153,11 @@ def roofline(idx, tag, filename, FLOPS, AIHBM, AIL2, AIL1):
     ax.text(xlim[0]*1.1, ylim[1]/1.1, filename, horizontalalignment='left', verticalalignment='top')
 
     plt.savefig('picture/' + filename + '.png')
+
+    if idx == 0:
+        print("Summary:")
+
+    with open('picture/' + filename + '.txt', 'a') as f:
+        for i in range(len(AIHBM)):
+            print(f"{FLOPS[i]/1000:.1f}TFLOP/s, L1 AI:{AIL1[i]:.1f}FLOPSs/Byte, {FLOPS[i] / roofline_boundary(AIL1[i], L1_PEAK) * 100:.2f}%; L2 AI:{AIL2[i]:.1f}FLOPSs/Byte, {FLOPS[i] / roofline_boundary(AIL2[i], L2_PEAK) * 100:.2f}%; HBM AI:{AIHBM[i]:.1f}FLOPSs/Byte, {FLOPS[i] / roofline_boundary(AIHBM[i], HBM_PEAK) * 100:.2f}%")
+            f.write(f"{FLOPS[i]/1000:.1f}TFLOP/s, L1 AI:{AIL1[i]:.1f}FLOPSs/Byte, {FLOPS[i] / roofline_boundary(AIL1[i], L1_PEAK) * 100:.2f}%; L2 AI:{AIL2[i]:.1f}FLOPSs/Byte, {FLOPS[i] / roofline_boundary(AIL2[i], L2_PEAK) * 100:.2f}%; HBM AI:{AIHBM[i]:.1f}FLOPSs/Byte, {FLOPS[i] / roofline_boundary(AIHBM[i], HBM_PEAK) * 100:.2f}%\n")
