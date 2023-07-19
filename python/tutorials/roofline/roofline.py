@@ -17,17 +17,17 @@ markerwidth = 2
 maxchar = 25
 
 nx = 10000
-xmin = -3
+xmin = 0
 xmax = 4
-ymin = 1
-ymax = 1000000
+ymin = 1000
+ymax = 300000
 
 L1_PEAK = 58776.
 L2_PEAK = 7817.
 HBM_PEAK = 1935.
 PERFORMANCE_PEAK = 234.
 
-fig = plt.figure(1, figsize=(10.67 * 2, 6.6 * 2))
+fig = plt.figure(1, figsize=(10.67 * 3, 6.6 * 3))
 plt.clf()
 marker_handles = list()
 patch_handles = list()
@@ -121,31 +121,31 @@ def roofline(idx, tag, filename, FLOPS, AIHBM, AIL2, AIL1):
     # x: arithmetic intensity
     roofline_boundary = lambda x, peak : min(1000 * PERFORMANCE_PEAK, peak * x)
 
-    for i in range(len(AIHBM)):
-        # plot a line with flops
-        ax.axhline(y=float(FLOPS[i]), c=colors[idx % 10], ls='--', lw='1')
-        ax.text(xlim[-1]*1.1, float(FLOPS[i]), f'{FLOPS[i]/1000:.1f} TFLOP/s', fontsize=8, color=colors[idx % 10])
-            
-        ax.plot(float(AIL1[i]), float(FLOPS[i]), c=colors[idx % 10], marker=styles[0],
-                linestyle='None', ms=markersize, markerfacecolor='none',
-                markeredgewidth=markerwidth, label=tag)
+    # plot a line with flops
+    ax.axhline(y=float(FLOPS), c=colors[idx % 10], ls='--', lw='1')
+    ax.text(xlim[-1]*1.1, float(FLOPS), f'{FLOPS/1000:.1f} TFLOP/s', fontsize=10, color=colors[idx % 10])
+        
+    ax.plot(float(AIL1), float(FLOPS), c=colors[idx % 10], marker=styles[0],
+            linestyle='None', ms=markersize, markerfacecolor='none',
+            markeredgewidth=markerwidth, label=tag)
 
-        ax.plot(float(AIL2[i]), float(FLOPS[i]), c=colors[idx % 10], marker=styles[1],
-                linestyle='None', ms=markersize, markerfacecolor='none',
-                markeredgewidth=markerwidth, label=tag)
+    ax.plot(float(AIL2), float(FLOPS), c=colors[idx % 10], marker=styles[1],
+            linestyle='None', ms=markersize, markerfacecolor='none',
+            markeredgewidth=markerwidth, label=tag)
 
-        ax.plot(float(AIHBM[i]), float(FLOPS[i]), c=colors[idx % 10], marker=styles[2],
-                linestyle='None', ms=markersize, markerfacecolor='none',
-                markeredgewidth=markerwidth, label=tag)
+    ax.plot(float(AIHBM), float(FLOPS), c=colors[idx % 10], marker=styles[2],
+            linestyle='None', ms=markersize, markerfacecolor='none',
+            markeredgewidth=markerwidth, label=tag)
 
-        ax.text(xlim[0]*1.1, float(FLOPS[i]), f"L1 AI:{AIL1[i]:.1f}FLOPSs/Byte, {FLOPS[i] / roofline_boundary(AIL1[i], L1_PEAK) * 100:.2f}%; L2 AI:{AIL2[i]:.1f}FLOPSs/Byte, {FLOPS[i] / roofline_boundary(AIL2[i], L2_PEAK) * 100:.2f}%; HBM AI:{AIHBM[i]:.1f}FLOPSs/Byte, {FLOPS[i] / roofline_boundary(AIHBM[i], HBM_PEAK) * 100:.2f}%", fontsize=10, color=colors[idx % 10])
+    description =  f"L1 AI:{AIL1:.1f}FLOPs/Byte, {FLOPS / roofline_boundary(AIL1, L1_PEAK) * 100:.2f}%; L2 AI:{AIL2:.1f}FLOPs/Byte, {FLOPS / roofline_boundary(AIL2, L2_PEAK) * 100:.2f}%; HBM AI:{AIHBM:.1f}FLOPs/Byte, {FLOPS / roofline_boundary(AIHBM, HBM_PEAK) * 100:.2f}%"
+    ax.text(xlim[0]*1.1, float(FLOPS), description, fontsize=10, color=colors[idx % 10])
 
 
     leg1 = plt.legend(handles=marker_handles, loc='lower right', ncol=3, bbox_to_anchor=(1, 0))
     ax.add_artist(leg1)
 
     patch_handles.append(mpatches.Patch(
-                color=colors[idx % 10], label=tag))
+                color=colors[idx % 10], label=tag + ':' + description))
 
     leg2 = plt.legend(handles=patch_handles, loc=4, ncol=1, bbox_to_anchor=(1, 0.1), scatterpoints=1)
     ax.add_artist(leg2)
@@ -158,6 +158,5 @@ def roofline(idx, tag, filename, FLOPS, AIHBM, AIL2, AIL1):
         print("Summary:")
 
     with open('picture/' + filename + '.txt', 'a') as f:
-        for i in range(len(AIHBM)):
-            print(f"{FLOPS[i]/1000:.1f}TFLOP/s, L1 AI:{AIL1[i]:.1f}FLOPSs/Byte, {FLOPS[i] / roofline_boundary(AIL1[i], L1_PEAK) * 100:.2f}%; L2 AI:{AIL2[i]:.1f}FLOPSs/Byte, {FLOPS[i] / roofline_boundary(AIL2[i], L2_PEAK) * 100:.2f}%; HBM AI:{AIHBM[i]:.1f}FLOPSs/Byte, {FLOPS[i] / roofline_boundary(AIHBM[i], HBM_PEAK) * 100:.2f}%")
-            f.write(f"{FLOPS[i]/1000:.1f}TFLOP/s, L1 AI:{AIL1[i]:.1f}FLOPSs/Byte, {FLOPS[i] / roofline_boundary(AIL1[i], L1_PEAK) * 100:.2f}%; L2 AI:{AIL2[i]:.1f}FLOPSs/Byte, {FLOPS[i] / roofline_boundary(AIL2[i], L2_PEAK) * 100:.2f}%; HBM AI:{AIHBM[i]:.1f}FLOPSs/Byte, {FLOPS[i] / roofline_boundary(AIHBM[i], HBM_PEAK) * 100:.2f}%\n")
+        print(f"{FLOPS/1000:.1f}TFLOP/s, L1 AI:{AIL1:.1f}FLOPs/Byte, {FLOPS / roofline_boundary(AIL1, L1_PEAK) * 100:.2f}%; L2 AI:{AIL2:.1f}FLOPs/Byte, {FLOPS / roofline_boundary(AIL2, L2_PEAK) * 100:.2f}%; HBM AI:{AIHBM:.1f}FLOPs/Byte, {FLOPS / roofline_boundary(AIHBM, HBM_PEAK) * 100:.2f}%")
+        f.write(f"{FLOPS/1000:.1f}TFLOP/s, L1 AI:{AIL1:.1f}FLOPs/Byte, {FLOPS / roofline_boundary(AIL1, L1_PEAK) * 100:.2f}%; L2 AI:{AIL2:.1f}FLOPs/Byte, {FLOPS / roofline_boundary(AIL2, L2_PEAK) * 100:.2f}%; HBM AI:{AIHBM:.1f}FLOPs/Byte, {FLOPS / roofline_boundary(AIHBM, HBM_PEAK) * 100:.2f}%\n")
