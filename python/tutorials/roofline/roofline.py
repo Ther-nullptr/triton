@@ -137,7 +137,7 @@ def roofline(idx, tag, filename, FLOPS, AIHBM, AIL2, AIL1):
             linestyle='None', ms=markersize, markerfacecolor='none',
             markeredgewidth=markerwidth, label=tag)
 
-    description =  f"L1 AI:{AIL1:.1f}FLOPs/Byte, {FLOPS / roofline_boundary(AIL1, L1_PEAK) * 100:.2f}%; L2 AI:{AIL2:.1f}FLOPs/Byte, {FLOPS / roofline_boundary(AIL2, L2_PEAK) * 100:.2f}%; HBM AI:{AIHBM:.1f}FLOPs/Byte, {FLOPS / roofline_boundary(AIHBM, HBM_PEAK) * 100:.2f}%"
+    description =  f"L1 AI:{AIL1:.1f}FLOPs/Byte, {FLOPS / roofline_boundary(AIL1, L1_PEAK) * 100:.2f}%; L2 AI:{AIL2:.1f}FLOPs/Byte ,{FLOPS / roofline_boundary(AIL2, L2_PEAK) * 100:.2f}%; HBM AI:{AIHBM:.1f}FLOPs/Byte, {FLOPS / roofline_boundary(AIHBM, HBM_PEAK) * 100:.2f}%; FLOPS:{FLOPS/1000:.1f}TFLOP/s"
     ax.text(xlim[0]*1.1, float(FLOPS), description, fontsize=10, color=colors[idx % 10])
 
 

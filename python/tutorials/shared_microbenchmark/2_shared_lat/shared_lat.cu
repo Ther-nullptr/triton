@@ -10,6 +10,7 @@
 // Launch only one thread to calcaulte the latency using a pointer-chasing
 // array technique
 #define THREADS_NUM 1
+#define GRID_NUM 1
 // iterate over the array ITERS times
 #define ITERS 2048
 
@@ -74,7 +75,7 @@ int main() {
   gpuErrchk(cudaMalloc(&stopClk_g, sizeof(uint32_t)));
   gpuErrchk(cudaMalloc(&dsink_g, sizeof(uint64_t)));
 
-  shared_lat<<<1, THREADS_NUM>>>(startClk_g, stopClk_g, dsink_g, 1);
+  shared_lat<<<GRID_NUM, THREADS_NUM>>>(startClk_g, stopClk_g, dsink_g, 1);
   gpuErrchk(cudaPeekAtLastError());
 
   gpuErrchk(cudaMemcpy(startClk, startClk_g, sizeof(uint32_t),

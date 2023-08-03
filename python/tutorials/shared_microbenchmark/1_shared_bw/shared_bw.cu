@@ -16,7 +16,7 @@ __global__ void shared_bw(uint64_t *startClk, uint64_t *stopClk,
   uint32_t tid = threadIdx.x;
   uint32_t bid = blockIdx.x;
   uint32_t uid = bid * blockDim.x + tid;
-  uint32_t n_threads = blockDim.x * gridDim.x;
+  uint32_t n_threads = blockDim.x * gridDim.x; // 1024
 
   // a register to avoid compiler optimization
   // uint32_t sink0 = 0;
@@ -59,8 +59,14 @@ int main() {
   intilizeDeviceProp(0);
 
   BLOCKS_NUM = 1;
+  int ratio = 1;
+  THREADS_PER_BLOCK = THREADS_PER_BLOCK / ratio;
   TOTAL_THREADS = THREADS_PER_BLOCK * BLOCKS_NUM;
   THREADS_PER_SM = THREADS_PER_BLOCK * BLOCKS_NUM;
+
+  std::cout << "TOTAL THREADS = " << TOTAL_THREADS << std::endl;
+  std::cout << "THREADS PER BLOCK = " << THREADS_PER_BLOCK << std::endl;
+  std::cout << "TOTAL THREADS PER SM = " << THREADS_PER_SM << std::endl;
 
   assert(SHARED_MEM_SIZE * sizeof(uint32_t) < MAX_SHARED_MEM_SIZE_PER_BLOCK);
 

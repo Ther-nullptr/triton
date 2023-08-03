@@ -6,13 +6,14 @@ from functools import partial
 
 def parse_args():
     args = argparse.ArgumentParser()
-    args.add_argument("--acc-dtype", type=str, choices=["f16", "f32"], default="f32")
-    args.add_argument("--out-dtype", type=str, choices=["f16", "f32"], default="f16")
+    args.add_argument("--acc-dtype", type=str, choices=["f16", "f32", "f64"], default="f32")
+    args.add_argument("--out-dtype", type=str, choices=["f16", "f32", "f64"], default="f16")
     args.add_argument("--split-k-slices", type=int, default=1)
     args.add_argument("--profiling-iterations", type=int, default=5)
     args.add_argument("--warmup-iterations", type=int, default=1)
-    args.add_argument("--cutlass-home", type=str, default='/home/yujin/workspace/cutlass')
+    args.add_argument("--cutlass-home", type=str, default="/home/yujin/workspace/cutlass")
     args.add_argument("--log-dir", type=str, default="logs/cutlass")
+    args.add_argument("--split-k-mode", type=str, default="serial")
     parsed = args.parse_args()
     parsed.cutlass_home = parsed.cutlass_home or os.getenv("CUTLASS_HOME")
     assert (
@@ -25,12 +26,12 @@ def parse_args():
 ARGS = parse_args()
 
 def _run_cutlass(instruction: str, workload: str):
+    print(instruction)
     _ = subprocess.check_output(instruction, shell=True)
     df = pd.read_csv(f"{ARGS.log_dir}/{workload}.gemm.csv")
     df.sort_values('GFLOPs', inplace=True, ascending=False)
     df.reset_index(inplace=True)
     print(f"[{workload}] max TFLOPs: {df['GFLOPs'][0] / 1000}, operation: {df['Operation'][0]}, runtime: {df['Runtime'][0]}, GB/s: {df['GB/s'][0]}")
-
 
 
 def _run_gemm(
@@ -41,6 +42,7 @@ def _run_gemm(
     k: int,
     acc_dtype: str,
     out_dtype: str,
+    split_k_mode: str,
     warmup_iterations: int,
     profiling_iterations: int,
     k_slices: int
@@ -50,8 +52,9 @@ def _run_gemm(
         f" --warmup_iterations={warmup_iterations}"
         f" --iterations={profiling_iterations}"
         f" --batch_count={b} --n={n} --m={m} --k={k}"
-        f" --A=f16:row --B=f16:column --C={out_dtype}:column"
+        f" --A={ARGS.out_dtype}:row --B={ARGS.out_dtype}:column --C={out_dtype}:column"
         f" --accumulator-type={acc_dtype}"
+        f" --split-k-mode={split_k_mode}"
         f" --split-k-slices={k_slices}"
         f" --sort-results=true"
         f" --output={ARGS.log_dir}/{workload}.csv",
@@ -67,6 +70,7 @@ def GMM(
     k: int,
     acc_dtype: str,
     out_dtype: str,
+    split_k_mode: str,
     warmup_iterations: int,
     profiling_iterations: int,
     k_slices: int
@@ -79,6 +83,7 @@ def GMM(
         k,
         acc_dtype,
         out_dtype,
+        split_k_mode,
         warmup_iterations,
         profiling_iterations,
         k_slices
@@ -89,15 +94,16 @@ WORKLOADS = {}
 
 
 def main():
-    for n in [32, 64, 128, 256]:
-        for m, k in [(2048, 8192), (8192, 2048), (2752, 8192), (8192, 2752)]:
-            WORKLOADS.update(
-                {
-                    f"{m}-{n}-{k}": partial(
-                        GMM, workload=f"m{m}-n{n}-k{k}-ksep{ARGS.split_k_slices}", b=1, m=m, n=n, k=k
-                    )
-                }
-            )
+    # for n in [32, 64, 128, 256]:
+    #     for m, k in [(2048, 8192), (8192, 2048), (2752, 8192), (8192, 2752)]:
+    for m, n, k in [(2048, 128, 8192)]:
+        WORKLOADS.update(
+            {
+                f"{m}-{n}-{k}": partial(
+                    GMM, workload=f"m{m}-n{n}-k{k}-ksep{ARGS.split_k_slices}", b=1, m=m, n=n, k=k
+                )
+            }
+        )
 
     for workload_name in WORKLOADS.keys():
         WORKLOADS.get(workload_name)(
@@ -105,6 +111,7 @@ def main():
             out_dtype=ARGS.out_dtype,
             warmup_iterations=ARGS.warmup_iterations,
             profiling_iterations=ARGS.profiling_iterations,
+            split_k_mode=ARGS.split_k_mode,
             k_slices=ARGS.split_k_slices
         )
 

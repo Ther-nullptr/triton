@@ -38,6 +38,11 @@ cublas_test_general
 
 shared_lat
 shared_bw
+template_shared_lat
+template_example
+
+lat_half
+MaxFlops_half
 
 *.ncu-rep
 *.png
